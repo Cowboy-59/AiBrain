@@ -136,26 +136,54 @@ interface Attendee {
 
 ### BeansConfig
 
-Configuration for BEANS file scanning.
+Configuration for BEANS file scanning. Uses [hmans/beans](https://github.com/hmans/beans) format.
 
 ```typescript
 interface BeansConfig {
-  scanPaths: string[];       // Directories to scan
+  scanPaths: string[];       // Directories containing .beans/ folders
   scanInterval: number;      // Minutes between scans (default: 5)
   enabled: boolean;
 }
 ```
 
-### PriorityItem (Runtime)
+### Bean (Runtime)
 
-Represents a priority item extracted from BEANS files.
+Represents a task/issue from BEANS files (hmans/beans YAML frontmatter format).
+
+```typescript
+interface Bean {
+  id: string;                // NanoID from filename (e.g., "beans-0ajg")
+  slug?: string;             // Optional slug from filename
+  title: string;             // Task title from frontmatter
+  status: BeanStatus;        // Task status
+  type?: BeanType;           // Task type
+  priority?: string | number; // Priority (1 = highest, or string like "high")
+  tags?: string[];           // Optional tags
+  createdAt?: Date;
+  updatedAt?: Date;
+  parent?: string;           // Parent bean ID for hierarchies
+  blocking?: string[];       // IDs this bean blocks
+  blockedBy?: string[];      // IDs blocking this bean
+  body: string;              // Markdown content
+  sourceFile: string;        // Full path to BEANS file
+}
+
+type BeanStatus = 'todo' | 'in_progress' | 'completed' | 'archived';
+type BeanType = 'task' | 'bug' | 'feature' | 'epic';
+```
+
+### PriorityItem (Runtime, Filtered View)
+
+Simplified view of high-priority beans for display.
 
 ```typescript
 interface PriorityItem {
   id: string;
   sourceFile: string;        // Full path to BEANS file
-  description: string;
-  priority: number;          // 1 = highest
+  title: string;
+  description: string;       // Body excerpt
+  priority: number | string; // 1 = highest
+  status: BeanStatus;
   extractedAt: Date;
 }
 ```

@@ -113,23 +113,37 @@ The primary user who owns and operates the system, managing personal and profess
 
 ### FR-4: BEANS File Scanning
 
-**Description**: Scan AI_development folder for BEANS files and extract priority 1 items
+**Description**: Scan AI_development folder for BEANS files and extract priority items using [hmans/beans](https://github.com/hmans/beans) format
 
-**BEANS File Format** (clarified 2026-02-04): Markdown files with priority section headers:
+**BEANS File Format** (updated 2026-02-04): Markdown files with YAML frontmatter in `.beans/` directories:
 
 ```markdown
-## Priority 1
-- Task description here
-- Another P1 task
+---
+title: Task description here
+status: todo
+type: task
+priority: 1
+created_at: 2026-02-04T10:00:00Z
+updated_at: 2026-02-04T10:00:00Z
+---
 
-## Priority 2
-- Lower priority item
+Detailed task description in markdown body.
 ```
+
+**Key Fields**:
+
+- `title`: Task name
+- `status`: todo, in_progress, completed
+- `type`: task, bug, feature
+- `priority`: 1 (highest) to 4 (lowest), or string values
+- `parent`: Optional parent bean ID for hierarchies
+- `blocking`/`blocked_by`: Dependency tracking
 
 **Acceptance Criteria**:
 
-- [ ] Automatically discover BEANS files (*.md with `## Priority N` headers) in configured directories
-- [ ] Parse markdown headers and extract list items under each priority section
+- [ ] Automatically discover `.beans/` directories in configured paths
+- [ ] Parse YAML frontmatter to extract priority field
+- [ ] Filter and display items where priority = 1 (or "high")
 - [ ] Display aggregated priority 1 items with source file reference
 - [ ] Refresh at configurable intervals
 
@@ -208,7 +222,7 @@ The primary user who owns and operates the system, managing personal and profess
 - OpenClaw framework is suitable as foundation and supports required extensibility
 - User has valid credentials for all email accounts to be connected
 - User has a Telegram account and can create/configure a bot
-- BEANS files use markdown format with `## Priority N` headers (see FR-4)
+- BEANS files use [hmans/beans](https://github.com/hmans/beans) format with YAML frontmatter (see FR-4)
 - External services (Samanage, Monday.com) provide API access
 - The host machine has persistent internet connectivity
 - User has appropriate permissions for shared calendars

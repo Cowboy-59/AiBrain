@@ -190,15 +190,30 @@ interface PriorityItem {
 
 ### NotificationConfig
 
-Configuration for Telegram notifications.
+Configuration for notifications (Telegram or Teams).
 
 ```typescript
 interface NotificationConfig {
-  telegram: {
-    botToken: string;        // Telegram bot token
-    chatId: string;          // User's chat ID
-  };
+  channel: NotificationChannel;
+  telegram?: TelegramConfig;
+  teams?: TeamsConfig;
+  digestInterval: number;    // Minutes between digest messages (default: 5)
   rules: NotificationRule[];
+}
+
+type NotificationChannel = 'telegram' | 'teams';
+
+interface TelegramConfig {
+  botToken: string;          // Telegram bot token
+  chatId: string;            // User's chat ID
+}
+
+interface TeamsConfig {
+  webhookUrl: string;        // Incoming webhook URL
+  channelId?: string;        // Teams channel ID (for bot interaction)
+  tenantId?: string;         // Azure AD tenant ID (for bot auth)
+  botAppId?: string;         // Bot application ID (for bidirectional)
+  botAppSecret?: string;     // Bot secret (encrypted at rest)
 }
 
 interface NotificationRule {
@@ -241,6 +256,71 @@ interface ServiceCredentials {
   apiToken?: string;
   // Additional provider-specific fields
 }
+```
+
+### ChatMessage
+
+Represents a message in the conversational chat interface.
+
+```typescript
+interface ChatMessage {
+  id: string;
+  content: string;
+  sender: ChatSender;
+  timestamp: Date;
+  intent?: ConfigurationIntent;  // Detected intent (if any)
+  relatedEntityId?: string;      // Reference to configured entity
+}
+
+type ChatSender = 'user' | 'system';
+```
+
+### ConversationContext
+
+Tracks state during multi-step configuration conversations.
+
+```typescript
+interface ConversationContext {
+  id: string;
+  wizardType?: WizardType;       // Current wizard (if in guided setup)
+  currentStep: number;
+  collectedValues: Record<string, unknown>;
+  pendingQuestion?: string;
+  startedAt: Date;
+  lastActivity: Date;
+}
+
+type WizardType =
+  | 'add_email_account'
+  | 'add_calendar'
+  | 'configure_notifications'
+  | 'add_external_service'
+  | 'configure_beans';
+```
+
+### ConfigurationIntent
+
+Detected intent from user's natural language input.
+
+```typescript
+interface ConfigurationIntent {
+  type: IntentType;
+  confidence: number;            // 0-1 confidence score
+  entities: Record<string, string>;  // Extracted entities
+  rawInput: string;
+}
+
+type IntentType =
+  | 'add_email'
+  | 'remove_email'
+  | 'list_emails'
+  | 'show_calendar'
+  | 'add_calendar'
+  | 'show_priority'
+  | 'configure_notifications'
+  | 'show_status'
+  | 'help'
+  | 'unknown';
 ```
 
 ## Entity Relationships

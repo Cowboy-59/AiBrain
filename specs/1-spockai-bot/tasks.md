@@ -222,22 +222,24 @@
 
 - [ ] T086 [US7] Implement notify teams-setup command in skills/spockai/notify/commands/teams-setup.ts
 - [ ] T087 [US7] Implement notify channel command to switch Telegram/Teams in skills/spockai/notify/commands/channel.ts
+- [ ] T088 [US7] Create Teams bot listener for bidirectional queries in skills/spockai/notify/teams-bot.ts
 
 ## Phase 10: Configuration and Polish
 
-- [ ] T088 Create spockai-config SKILL.md definition in skills/spockai/config/SKILL.md
-- [ ] T089 Implement config show command in skills/spockai/config/commands/show.ts
-- [ ] T090 Implement config export command in skills/spockai/config/commands/export.ts
-- [ ] T091 Implement config backup command in skills/spockai/config/commands/backup.ts
-- [ ] T092 [P] Create installation script for systemd/Windows service
-- [ ] T093 [FR-6] Implement graceful error recovery with automatic restart in skills/spockai/core/recovery.ts
-- [ ] T094 [FR-6] Add health check endpoint for uptime monitoring in skills/spockai/core/health.ts
-- [ ] T095 [FR-6] Implement resource usage monitoring (memory <100MB, CPU <5%) in skills/spockai/core/monitor.ts
-- [ ] T096 [P] Add comprehensive error handling across all skills
-- [ ] T097 [P] Add request/response logging for debugging
-- [ ] T098 Update quickstart.md with actual tested commands
-- [ ] T099 Create README.md for skills/spockai/ directory
-- [ ] T100 Run full integration test: email to notification to Telegram/Teams
+- [ ] T089 Create spockai-config SKILL.md definition in skills/spockai/config/SKILL.md
+- [ ] T090 Implement config show command in skills/spockai/config/commands/show.ts
+- [ ] T091 Implement config export command in skills/spockai/config/commands/export.ts
+- [ ] T092 Implement config backup command in skills/spockai/config/commands/backup.ts
+- [ ] T093 [P] Create installation script for systemd/Windows service
+- [ ] T094 [FR-6] Implement graceful error recovery with automatic restart in skills/spockai/core/recovery.ts
+- [ ] T095 [FR-6] Add health check endpoint for uptime monitoring in skills/spockai/core/health.ts
+- [ ] T096 [FR-6] Implement resource usage monitoring (memory <100MB, CPU <5%) in skills/spockai/core/monitor.ts
+- [ ] T097 [P] Add comprehensive error handling across all skills
+- [ ] T098 [P] Add request/response logging for debugging
+- [ ] T099 [NFR] Add priority classification accuracy measurement (target >90%) in skills/spockai/core/metrics.ts
+- [ ] T100 Update quickstart.md with actual tested commands
+- [ ] T101 Create README.md for skills/spockai/ directory
+- [ ] T102 Run full integration test: email to notification to Telegram/Teams
 
 ## Dependencies
 
@@ -261,8 +263,8 @@ Phase 1 (Setup) -> Phase 2 (Foundational) -> Phase 3+ (User Stories)
 6. US3 BEANS (T046-T055) - Can run parallel with US2, US5
 7. US5 Services (T056-T065) - Can run parallel with US2, US3
 8. US6 Chat Interface (T066-T080) - Conversational UI
-9. US7 Teams (T081-T087) - Can run parallel with US6
-10. Polish (T088-T100)
+9. US7 Teams (T081-T088) - Can run parallel with US6
+10. Polish (T089-T102)
 
 ## Implementation Strategy
 
@@ -277,15 +279,15 @@ Phase 1 (Setup) -> Phase 2 (Foundational) -> Phase 3+ (User Stories)
 
 | Metric                  | Value                   |
 | ----------------------- | ----------------------- |
-| **Total Tasks**         | 100                     |
+| **Total Tasks**         | 102                     |
 | **US1 (Email)**         | 14 tasks                |
 | **US2 (Calendar)**      | 10 tasks                |
 | **US3 (BEANS)**         | 10 tasks                |
 | **US4 (Notifications)** | 11 tasks                |
 | **US5 (Services)**      | 10 tasks                |
 | **US6 (Chat)**          | 15 tasks                |
-| **US7 (Teams)**         | 7 tasks                 |
+| **US7 (Teams)**         | 8 tasks                 |
 | **Setup/Foundational**  | 10 tasks                |
-| **Polish**              | 13 tasks                |
+| **Polish**              | 14 tasks                |
 | **Parallel [P]**        | 28 tasks                |
 | **MVP Scope**           | 50 tasks (Phases 1-4,8) |

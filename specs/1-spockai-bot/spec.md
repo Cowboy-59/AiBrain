@@ -61,7 +61,7 @@ The primary user who owns and operates the system, managing personal and profess
 
 **Given** a high-priority email arrives or an urgent calendar reminder triggers
 **When** the priority threshold is met
-**Then** SpockAI sends a notification to the user's Telegram chat within 2 minutes
+**Then** SpockAI sends a notification to the user's configured channel (Telegram or Teams) within 2 minutes
 
 ### Scenario 5: External Service Integration
 

@@ -24,6 +24,18 @@ warn() { echo -e "${YELLOW}$1${NC}"; }
 info() { echo -e "${BLUE}$1${NC}"; }
 success() { echo -e "${GREEN}$1${NC}"; }
 
+# Cross-platform file hash (works on Mac, Linux, Windows/Git Bash)
+get_file_hash() {
+    local file="$1"
+    if command -v md5sum &>/dev/null; then
+        md5sum "$file" | cut -d' ' -f1
+    elif command -v md5 &>/dev/null; then
+        get_file_hash "$file"
+    else
+        shasum -a 256 "$file" | cut -d' ' -f1
+    fi
+}
+
 # Detect if we're in starter kit (has .claude/master.txt)
 detect_kit_path() {
     if [[ -f "$PWD/.claude/master.txt" ]]; then
@@ -92,8 +104,8 @@ compare_files() {
 
             if [[ -f "$global_file" ]]; then
                 local kit_hash global_hash
-                kit_hash=$(md5 -q "$file")
-                global_hash=$(md5 -q "$global_file")
+                kit_hash=$(get_file_hash "$file")
+                global_hash=$(get_file_hash "$global_file")
                 if [[ "$kit_hash" == "$global_hash" ]]; then
                     ((identical++))
                 else
@@ -127,8 +139,8 @@ compare_files() {
 
         if [[ -f "$global_file" ]]; then
             local kit_hash global_hash
-            kit_hash=$(md5 -q "$kit_file")
-            global_hash=$(md5 -q "$global_file")
+            kit_hash=$(get_file_hash "$kit_file")
+            global_hash=$(get_file_hash "$global_file")
             if [[ "$kit_hash" == "$global_hash" ]]; then
                 ((identical++))
             else

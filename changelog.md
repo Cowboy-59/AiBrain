@@ -11,6 +11,10 @@ All notable changes to the Claude Project Starter Kit will be documented here.
 
 ---
 
+### February 4, 2026
+
+- **✨ SpockAI Bot Specification** - Complete spec-driven development workflow including research, data model, contracts, and 75 implementation tasks with clarifications
+
 ### January 14, 2026
 
 ### January 14, 2026

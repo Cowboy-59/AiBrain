@@ -20,6 +20,18 @@ error() {
     exit 1
 }
 
+# Cross-platform file hash (works on Mac, Linux, Windows/Git Bash)
+get_file_hash() {
+    local file="$1"
+    if command -v md5sum &>/dev/null; then
+        md5sum "$file" | cut -d' ' -f1
+    elif command -v md5 &>/dev/null; then
+        get_file_hash "$file"
+    else
+        shasum -a 256 "$file" | cut -d' ' -f1
+    fi
+}
+
 warn() {
     echo -e "${YELLOW}$1${NC}"
 }
@@ -86,14 +98,41 @@ check_global_mcp() {
 check_browser_extension() {
     local ext_name="$1"
 
-    # Native messaging host locations for various Chromium browsers on macOS
-    local -a host_dirs=(
-        "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
-        "$HOME/Library/Application Support/Chromium/NativeMessagingHosts"
-        "$HOME/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts"
-        "$HOME/Library/Application Support/Microsoft Edge/NativeMessagingHosts"
-        "$HOME/Library/Application Support/Arc/User Data/NativeMessagingHosts"
-    )
+    # Native messaging host locations for various Chromium browsers
+    local -a host_dirs=()
+
+    # Detect OS and set appropriate paths
+    case "$(uname -s)" in
+        Darwin)
+            # macOS paths
+            host_dirs=(
+                "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
+                "$HOME/Library/Application Support/Chromium/NativeMessagingHosts"
+                "$HOME/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts"
+                "$HOME/Library/Application Support/Microsoft Edge/NativeMessagingHosts"
+                "$HOME/Library/Application Support/Arc/User Data/NativeMessagingHosts"
+            )
+            ;;
+        MINGW*|MSYS*|CYGWIN*|Windows_NT)
+            # Windows paths (Git Bash / MSYS2 / Cygwin)
+            local appdata="${LOCALAPPDATA:-$HOME/AppData/Local}"
+            host_dirs=(
+                "$appdata/Google/Chrome/User Data/NativeMessagingHosts"
+                "$appdata/Chromium/User Data/NativeMessagingHosts"
+                "$appdata/BraveSoftware/Brave-Browser/User Data/NativeMessagingHosts"
+                "$appdata/Microsoft/Edge/User Data/NativeMessagingHosts"
+            )
+            ;;
+        Linux)
+            # Linux paths
+            host_dirs=(
+                "$HOME/.config/google-chrome/NativeMessagingHosts"
+                "$HOME/.config/chromium/NativeMessagingHosts"
+                "$HOME/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts"
+                "$HOME/.config/microsoft-edge/NativeMessagingHosts"
+            )
+            ;;
+    esac
 
     # Map extension names to native host manifest patterns
     local manifest_pattern=""
@@ -313,8 +352,8 @@ compare_rules() {
             has_changes=1
         else
             local kit_hash project_hash
-            kit_hash=$(md5 -q "$kit_file")
-            project_hash=$(md5 -q "$project_file")
+            kit_hash=$(get_file_hash "$kit_file")
+            project_hash=$(get_file_hash "$project_file")
 
             if [[ "$kit_hash" == "$project_hash" ]]; then
                 success "IDENTICAL: $rel_path"
@@ -408,8 +447,8 @@ compare_hooks() {
             echo ""
         else
             local kit_hash project_hash
-            kit_hash=$(md5 -q "$kit_hook")
-            project_hash=$(md5 -q "$project_hook")
+            kit_hash=$(get_file_hash "$kit_hook")
+            project_hash=$(get_file_hash "$project_hook")
 
             if [[ "$kit_hash" == "$project_hash" ]]; then
                 # Check if executable

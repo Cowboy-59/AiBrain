@@ -7,13 +7,15 @@
 
 ## User Stories (from spec.md)
 
-| ID  | Story                        | Priority | Description                                                |
-| --- | ---------------------------- | -------- | ---------------------------------------------------------- |
+| ID  | Story                        | Priority | Description                                                 |
+| --- | ---------------------------- | -------- | ----------------------------------------------------------- |
 | US1 | Morning Email Triage         | P1       | Multi-account email management with priority classification |
 | US2 | Calendar Awareness           | P2       | Display upcoming appointments from user and shared calendars |
-| US3 | Development Task Tracking    | P2       | Scan BEANS files for priority 1 items                      |
-| US4 | Real-time Notifications      | P1       | Send Telegram notifications for high-priority events       |
-| US5 | External Service Integration | P3       | Connect to Samanage and Monday.com                         |
+| US3 | Development Task Tracking    | P2       | Scan BEANS files for priority 1 items                       |
+| US4 | Real-time Notifications      | P1       | Send Telegram/Teams notifications for high-priority events  |
+| US5 | External Service Integration | P3       | Connect to Samanage and Monday.com                          |
+| US6 | Conversational Chat Interface| P1       | Dockable chat window for configuration and interaction      |
+| US7 | Teams Integration            | P2       | Microsoft Teams as alternative to Telegram                  |
 
 ## Phase 1: Setup
 
@@ -122,11 +124,11 @@
 ### Models
 
 - [ ] T046 [P] [US3] Create BeansConfig interface in skills/spockai/beans/types.ts
-- [ ] T047 [P] [US3] Create PriorityItem interface in skills/spockai/beans/types.ts
+- [ ] T047 [P] [US3] Create Bean interface (hmans/beans YAML frontmatter format) in skills/spockai/beans/types.ts
 
 ### Services
 
-- [ ] T048 [US3] Create BeansParser in skills/spockai/beans/parser.ts
+- [ ] T048 [US3] Create BeansParser with YAML frontmatter support using gray-matter in skills/spockai/beans/parser.ts
 - [ ] T049 [US3] Create BeansScanner with directory watching in skills/spockai/beans/scanner.ts
 - [ ] T050 [US3] Create BeansService in skills/spockai/beans/service.ts
 
@@ -168,18 +170,74 @@
 
 - [ ] T065 [US5] Wire external service updates to NotificationService
 
-## Phase 8: Configuration and Polish
+## Phase 8: User Story 6 - Conversational Chat Interface [US6]
 
-- [ ] T066 Create spockai-config SKILL.md definition in skills/spockai/config/SKILL.md
-- [ ] T067 Implement config show command in skills/spockai/config/commands/show.ts
-- [ ] T068 Implement config export command in skills/spockai/config/commands/export.ts
-- [ ] T069 Implement config backup command in skills/spockai/config/commands/backup.ts
-- [ ] T070 [P] Create installation script for systemd/Windows service
-- [ ] T071 [P] Add comprehensive error handling across all skills
-- [ ] T072 [P] Add request/response logging for debugging
-- [ ] T073 Update quickstart.md with actual tested commands
-- [ ] T074 Create README.md for skills/spockai/ directory
-- [ ] T075 Run full integration test: email to notification to Telegram
+**Goal**: User interacts with SpockAI through a dockable chat window for configuration and queries
+**Independent Test**: Open chat window, configure email account through conversation, verify account added
+
+### Models
+
+- [ ] T066 [P] [US6] Create ChatMessage interface in skills/spockai/chat/types.ts
+- [ ] T067 [P] [US6] Create ConversationContext interface in skills/spockai/chat/types.ts
+- [ ] T068 [P] [US6] Create ConfigurationIntent interface in skills/spockai/chat/types.ts
+
+### Services
+
+- [ ] T069 [US6] Create ConversationEngine for natural language config in skills/spockai/chat/engine.ts
+- [ ] T070 [US6] Create IntentParser for detecting config requests in skills/spockai/chat/intent-parser.ts
+- [ ] T071 [US6] Create ConfigurationWizard for guided setup in skills/spockai/chat/wizard.ts
+- [ ] T072 [US6] Create ResponseFormatter for conversational output in skills/spockai/chat/formatter.ts
+
+### UI Components
+
+- [ ] T073 [US6] Create Electron shell for dockable window in skills/spockai/chat/ui/app.ts
+- [ ] T074 [US6] Implement window docking (snap to screen edges) in skills/spockai/chat/ui/docking.ts
+- [ ] T075 [US6] Create chat message display component in skills/spockai/chat/ui/messages.tsx
+- [ ] T076 [US6] Create input field with send button in skills/spockai/chat/ui/input.tsx
+- [ ] T077 [US6] Implement system tray icon with quick actions in skills/spockai/chat/ui/tray.ts
+
+### Skill Commands
+
+- [ ] T078 [US6] Create spockai-chat SKILL.md definition in skills/spockai/chat/SKILL.md
+- [ ] T079 [US6] Implement chat open command to launch window in skills/spockai/chat/commands/open.ts
+- [ ] T080 [US6] Implement chat close command in skills/spockai/chat/commands/close.ts
+
+## Phase 9: User Story 7 - Teams Integration [US7]
+
+**Goal**: User can use Microsoft Teams as alternative to Telegram for notifications and chat
+**Independent Test**: Configure Teams webhook, trigger notification, verify message appears in Teams channel
+
+### Models
+
+- [ ] T081 [P] [US7] Create TeamsConfig interface in skills/spockai/notify/teams-types.ts
+- [ ] T082 [P] [US7] Create TeamsWebhook interface in skills/spockai/notify/teams-types.ts
+
+### Services
+
+- [ ] T083 [US7] Create TeamsNotifier using incoming webhooks in skills/spockai/notify/teams.ts
+- [ ] T084 [US7] Create TeamsAdaptiveCardBuilder for rich messages in skills/spockai/notify/teams-cards.ts
+- [ ] T085 [US7] Update NotificationService to support Teams as channel in skills/spockai/notify/service.ts
+
+### Skill Commands
+
+- [ ] T086 [US7] Implement notify teams-setup command in skills/spockai/notify/commands/teams-setup.ts
+- [ ] T087 [US7] Implement notify channel command to switch Telegram/Teams in skills/spockai/notify/commands/channel.ts
+
+## Phase 10: Configuration and Polish
+
+- [ ] T088 Create spockai-config SKILL.md definition in skills/spockai/config/SKILL.md
+- [ ] T089 Implement config show command in skills/spockai/config/commands/show.ts
+- [ ] T090 Implement config export command in skills/spockai/config/commands/export.ts
+- [ ] T091 Implement config backup command in skills/spockai/config/commands/backup.ts
+- [ ] T092 [P] Create installation script for systemd/Windows service
+- [ ] T093 [FR-6] Implement graceful error recovery with automatic restart in skills/spockai/core/recovery.ts
+- [ ] T094 [FR-6] Add health check endpoint for uptime monitoring in skills/spockai/core/health.ts
+- [ ] T095 [FR-6] Implement resource usage monitoring (memory <100MB, CPU <5%) in skills/spockai/core/monitor.ts
+- [ ] T096 [P] Add comprehensive error handling across all skills
+- [ ] T097 [P] Add request/response logging for debugging
+- [ ] T098 Update quickstart.md with actual tested commands
+- [ ] T099 Create README.md for skills/spockai/ directory
+- [ ] T100 Run full integration test: email to notification to Telegram/Teams
 
 ## Dependencies
 
@@ -188,8 +246,10 @@ Phase 1 (Setup) -> Phase 2 (Foundational) -> Phase 3+ (User Stories)
 **User Story Dependencies**:
 
 - US1 (Email) blocks US4 (Notifications) for email triggers
-- US4 (Notifications) is needed by US2, US3, US5 for alert integration
+- US4 (Notifications) is needed by US2, US3, US5, US6, US7 for alert integration
 - US2, US3, US5 are independent of each other
+- US6 (Chat) can start after US4, enables conversational config
+- US7 (Teams) can run parallel with US6, extends notification channels
 
 **Recommended Order**:
 
@@ -200,26 +260,32 @@ Phase 1 (Setup) -> Phase 2 (Foundational) -> Phase 3+ (User Stories)
 5. US2 Calendar (T036-T045) - Can run parallel with US3, US5
 6. US3 BEANS (T046-T055) - Can run parallel with US2, US5
 7. US5 Services (T056-T065) - Can run parallel with US2, US3
-8. Polish (T066-T075)
+8. US6 Chat Interface (T066-T080) - Conversational UI
+9. US7 Teams (T081-T087) - Can run parallel with US6
+10. Polish (T088-T100)
 
 ## Implementation Strategy
 
-**MVP Scope**: US1 (Email) + US4 (Notifications)
+**MVP Scope**: US1 (Email) + US4 (Notifications) + US6 (Chat)
 
-- Complete Phases 1-4 for functional email + Telegram notifications
-- This delivers core value: email priority awareness with alerts
+- Complete Phases 1-4, 8 for functional email + notifications + chat interface
+- This delivers core value: email priority awareness with conversational interaction
+
+**Extended Scope**: Add US7 (Teams) for enterprise users
 
 ## Summary
 
-| Metric                  | Value                |
-| ----------------------- | -------------------- |
-| **Total Tasks**         | 75                   |
-| **US1 (Email)**         | 14 tasks             |
-| **US2 (Calendar)**      | 10 tasks             |
-| **US3 (BEANS)**         | 10 tasks             |
-| **US4 (Notifications)** | 11 tasks             |
-| **US5 (Services)**      | 10 tasks             |
-| **Setup/Foundational**  | 10 tasks             |
-| **Polish**              | 10 tasks             |
-| **Parallel [P]**        | 23 tasks             |
-| **MVP Scope**           | 35 tasks (Phases 1-4) |
+| Metric                  | Value                   |
+| ----------------------- | ----------------------- |
+| **Total Tasks**         | 100                     |
+| **US1 (Email)**         | 14 tasks                |
+| **US2 (Calendar)**      | 10 tasks                |
+| **US3 (BEANS)**         | 10 tasks                |
+| **US4 (Notifications)** | 11 tasks                |
+| **US5 (Services)**      | 10 tasks                |
+| **US6 (Chat)**          | 15 tasks                |
+| **US7 (Teams)**         | 7 tasks                 |
+| **Setup/Foundational**  | 10 tasks                |
+| **Polish**              | 13 tasks                |
+| **Parallel [P]**        | 28 tasks                |
+| **MVP Scope**           | 50 tasks (Phases 1-4,8) |

@@ -187,7 +187,7 @@ ios/ or android/
 - Dependency order: Models before services before UI
 - Mark [P] for parallel execution (independent files)
 
-**Estimated Output**: 25-30 numbered, ordered tasks in tasks.md
+**Estimated Output**: 100 numbered, ordered tasks in tasks.md (organized by user story phases)
 
 **IMPORTANT**: This phase is executed by the /tasks command, NOT by /plan
 
@@ -210,7 +210,7 @@ ios/ or android/
 - [x] Phase 0: Research complete (/plan command)
 - [x] Phase 1: Design complete (/plan command)
 - [x] Phase 2: Task planning complete (/plan command - describe approach only)
-- [x] Phase 3: Tasks generated (/tasks command) - 75 tasks in tasks.md
+- [x] Phase 3: Tasks generated (/tasks command) - 100 tasks in tasks.md
 - [ ] Phase 4: Implementation complete
 - [ ] Phase 5: Validation passed
 

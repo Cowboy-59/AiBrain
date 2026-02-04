@@ -9,7 +9,7 @@
 
 ### Description
 
-SpockAI is a personal AI assistant bot that runs as a background service to help manage and prioritize information from multiple sources. It aggregates emails from multiple accounts, calendar events, AI development task priorities, and external service requests into a unified view with intelligent prioritization and real-time notifications via Telegram.
+SpockAI is a personal AI assistant bot that runs as a background service to help manage and prioritize information from multiple sources. It aggregates emails from multiple accounts, calendar events, AI development task priorities, and external service requests into a unified view with intelligent prioritization and real-time notifications via Telegram or Microsoft Teams. Users interact with SpockAI through a dockable chat window that supports conversational configuration and natural language queries.
 
 ### Foundation
 
@@ -28,8 +28,10 @@ SpockAI extends OpenClaw with custom skills for email management, calendar integ
 - Provide instant awareness of high-priority items requiring attention
 - Surface upcoming calendar appointments for the user and shared calendars
 - Track and display priority AI development tasks from project files
-- Deliver timely notifications through Telegram for urgent items
+- Deliver timely notifications through Telegram or Microsoft Teams for urgent items
 - Enable management of external service integrations (ticket systems, project boards)
+- Provide a conversational chat interface for configuration and interaction
+- Support dockable window for quick access on Windows desktop
 
 ### Target Users
 
@@ -66,6 +68,18 @@ The primary user who owns and operates the system, managing personal and profess
 **Given** the user has connected Samanage and Monday.com accounts
 **When** new requests arrive in Samanage or updates occur in Monday.com
 **Then** SpockAI retrieves and displays the relevant information
+
+### Scenario 6: Conversational Configuration
+
+**Given** the user opens the SpockAI chat window
+**When** the user types "add my work email account"
+**Then** SpockAI asks for email address, provider, and credentials through a guided conversation, then confirms successful setup
+
+### Scenario 7: Teams Notification Channel
+
+**Given** the user prefers Microsoft Teams over Telegram
+**When** the user configures Teams as the notification channel
+**Then** SpockAI sends all notifications to the configured Teams channel with rich adaptive cards
 
 ## Functional Requirements
 
@@ -147,19 +161,22 @@ Detailed task description in markdown body.
 - [ ] Display aggregated priority 1 items with source file reference
 - [ ] Refresh at configurable intervals
 
-### FR-5: Telegram Notifications
+### FR-5: Notifications (Telegram/Teams)
 
-**Description**: Send real-time notifications to user's Telegram chat
+**Description**: Send real-time notifications to user's Telegram chat or Microsoft Teams channel
 
 **Rate Limiting** (clarified 2026-02-04): Digest mode - bundle multiple notifications into a single message every N minutes (configurable, default 5 min) to prevent notification spam.
 
 **Acceptance Criteria**:
 
-- [ ] User can configure Telegram bot token and chat ID
+- [ ] User can choose notification channel: Telegram OR Microsoft Teams
+- [ ] User can configure Telegram bot token and chat ID (if Telegram selected)
+- [ ] User can configure Teams incoming webhook URL (if Teams selected)
 - [ ] Notifications bundled into digest messages at configurable intervals (default 5 min)
 - [ ] Notifications sent for high-priority emails within digest window
 - [ ] Notifications sent for calendar reminders at configured lead time
 - [ ] User can enable/disable notification types individually
+- [ ] Teams notifications use Adaptive Cards for rich formatting
 
 ### FR-6: Background Service Operation
 
@@ -194,6 +211,33 @@ Detailed task description in markdown body.
 - [ ] Set notification preferences and thresholds
 - [ ] Manage external service API connections
 
+### FR-9: Conversational Chat Interface
+
+**Description**: Provide a dockable chat window for natural language interaction and configuration
+
+**Acceptance Criteria**:
+
+- [ ] Small chat window launches from system tray or command
+- [ ] Window can dock/snap to any edge of the Windows screen
+- [ ] User can configure all settings through natural language conversation
+- [ ] SpockAI asks clarifying questions when needed (guided setup wizard)
+- [ ] Display information and responses in conversational format
+- [ ] Support queries like "show my high priority emails" or "what's on my calendar today"
+- [ ] Window remembers position and docking state between sessions
+- [ ] Minimize to system tray when not in use
+
+### FR-10: Microsoft Teams Integration
+
+**Description**: Support Microsoft Teams as an alternative notification and interaction channel
+
+**Acceptance Criteria**:
+
+- [ ] User can configure Teams incoming webhook for notifications
+- [ ] Notifications rendered as Adaptive Cards with action buttons
+- [ ] Support Teams channel or direct message delivery
+- [ ] Two-way interaction: user can query SpockAI from Teams chat
+- [ ] Rich formatting for email summaries, calendar views, and priority items
+
 ## Success Criteria
 
 | Metric                        | Target        | Measurement Method                                |
@@ -214,18 +258,23 @@ Detailed task description in markdown body.
 | Appointment         | Calendar event                                 | Title, start/end time, location, participants            |
 | BEANS File          | AI development priority file                   | File path, last scanned, items count                     |
 | Priority Item       | Task from BEANS file                           | Description, priority level, source file                 |
-| Notification Rule   | Trigger condition for Telegram alerts          | Event type, priority threshold, enabled status           |
+| Notification Rule   | Trigger condition for alerts                   | Event type, priority threshold, channel, enabled status  |
+| Notification Channel| Delivery method (Telegram or Teams)            | Channel type, webhook URL or bot token, chat ID          |
 | External Service    | Third-party integration                        | Service type, API endpoint, credentials                  |
+| Chat Message        | User or system message in chat window          | Content, timestamp, sender (user/system), intent         |
+| Conversation Context| State of ongoing chat configuration            | Current wizard step, collected values, pending questions |
 
 ## Assumptions
 
 - OpenClaw framework is suitable as foundation and supports required extensibility
 - User has valid credentials for all email accounts to be connected
-- User has a Telegram account and can create/configure a bot
+- User has either a Telegram account OR Microsoft Teams access for notifications
 - BEANS files use [hmans/beans](https://github.com/hmans/beans) format with YAML frontmatter (see FR-4)
 - External services (Samanage, Monday.com) provide API access
 - The host machine has persistent internet connectivity
 - User has appropriate permissions for shared calendars
+- Windows desktop environment for dockable chat window (Electron-based)
+- Teams webhook permissions available if Teams channel selected
 
 ## Out of Scope
 
@@ -233,6 +282,7 @@ Detailed task description in markdown body.
 - Creating or modifying calendar events (read-only access)
 - Editing BEANS files or modifying priorities
 - Two-way synchronization with external services (read-only initially)
-- Mobile application (background service only)
+- Mobile application (background service + desktop chat only)
 - Multi-user support (single user system)
-- Natural language processing for email content analysis
+- Natural language processing for email content analysis (simple intent parsing only)
+- macOS/Linux native chat window (Windows-first, cross-platform via Electron possible later)

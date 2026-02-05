@@ -226,19 +226,19 @@
 
 ## Phase 10: Configuration and Polish
 
-- [ ] T089 Create spockai-config SKILL.md definition in skills/spockai/config/SKILL.md
-- [ ] T090 Implement config show command in skills/spockai/config/commands/show.ts
-- [ ] T091 Implement config export command in skills/spockai/config/commands/export.ts
-- [ ] T092 Implement config backup command in skills/spockai/config/commands/backup.ts
-- [ ] T093 [P] Create installation script for systemd/Windows service
-- [ ] T094 [FR-6] Implement graceful error recovery with automatic restart in skills/spockai/core/recovery.ts
-- [ ] T095 [FR-6] Add health check endpoint for uptime monitoring in skills/spockai/core/health.ts
-- [ ] T096 [FR-6] Implement resource usage monitoring (memory <100MB, CPU <5%) in skills/spockai/core/monitor.ts
-- [ ] T097 [P] Add comprehensive error handling across all skills
-- [ ] T098 [P] Add request/response logging for debugging
-- [ ] T099 [NFR] Add priority classification accuracy measurement (target >90%) in skills/spockai/core/metrics.ts
-- [ ] T100 Update quickstart.md with actual tested commands
-- [ ] T101 Create README.md for skills/spockai/ directory
+- [x] T089 Create spockai-config SKILL.md definition in skills/spockai/config/SKILL.md
+- [x] T090 Implement config show command in skills/spockai/config/commands/show.ts
+- [x] T091 Implement config export command in skills/spockai/config/commands/export.ts
+- [x] T092 Implement config backup command in skills/spockai/config/commands/backup.ts
+- [x] T093 [P] Create installation script for systemd/Windows service
+- [x] T094 [FR-6] Implement graceful error recovery with automatic restart in skills/spockai/core/recovery.ts
+- [x] T095 [FR-6] Add health check endpoint for uptime monitoring in skills/spockai/core/health.ts
+- [x] T096 [FR-6] Implement resource usage monitoring (memory <100MB, CPU <5%) in skills/spockai/core/monitor.ts
+- [x] T097 [P] Add comprehensive error handling across all skills
+- [x] T098 [P] Add request/response logging for debugging
+- [x] T099 [NFR] Add priority classification accuracy measurement (target >90%) in skills/spockai/core/metrics.ts
+- [x] T100 Update quickstart.md with actual tested commands
+- [x] T101 Create README.md for skills/spockai/ directory
 - [ ] T102 Run full integration test: email to notification to Telegram/Teams
 
 ## Dependencies

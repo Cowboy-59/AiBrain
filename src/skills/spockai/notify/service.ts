@@ -14,6 +14,7 @@ import type {
 } from './types.js';
 import type { NotificationEventType } from '../types/index.js';
 import { TelegramNotifier, createTelegramNotifier } from './telegram.js';
+import { TeamsNotifier, createTeamsNotifier } from './teams.js';
 import { NotificationQueue, createNotificationQueue } from './queue.js';
 import { notifyLogger } from '../utils/logger.js';
 import { randomUUID } from 'crypto';
@@ -50,8 +51,7 @@ export class NotificationService {
     if (this.config.channel === 'telegram' && this.config.telegram) {
       this.notifier = createTelegramNotifier(this.config.telegram);
     } else if (this.config.channel === 'teams' && this.config.teams) {
-      // Teams notifier will be created in Phase 9
-      notifyLogger.warn('Teams notifications not yet implemented');
+      this.notifier = createTeamsNotifier(this.config.teams);
     }
 
     if (this.notifier) {

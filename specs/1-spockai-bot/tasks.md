@@ -209,20 +209,20 @@
 
 ### Models
 
-- [ ] T081 [P] [US7] Create TeamsConfig interface in skills/spockai/notify/teams-types.ts
-- [ ] T082 [P] [US7] Create TeamsWebhook interface in skills/spockai/notify/teams-types.ts
+- [x] T081 [P] [US7] Create TeamsConfig interface in skills/spockai/notify/teams-types.ts
+- [x] T082 [P] [US7] Create TeamsWebhook interface in skills/spockai/notify/teams-types.ts
 
 ### Services
 
-- [ ] T083 [US7] Create TeamsNotifier using incoming webhooks in skills/spockai/notify/teams.ts
-- [ ] T084 [US7] Create TeamsAdaptiveCardBuilder for rich messages in skills/spockai/notify/teams-cards.ts
-- [ ] T085 [US7] Update NotificationService to support Teams as channel in skills/spockai/notify/service.ts
+- [x] T083 [US7] Create TeamsNotifier using incoming webhooks in skills/spockai/notify/teams.ts
+- [x] T084 [US7] Create TeamsAdaptiveCardBuilder for rich messages in skills/spockai/notify/teams-cards.ts
+- [x] T085 [US7] Update NotificationService to support Teams as channel in skills/spockai/notify/service.ts
 
 ### Skill Commands
 
-- [ ] T086 [US7] Implement notify teams-setup command in skills/spockai/notify/commands/teams-setup.ts
-- [ ] T087 [US7] Implement notify channel command to switch Telegram/Teams in skills/spockai/notify/commands/channel.ts
-- [ ] T088 [US7] Create Teams bot listener for bidirectional queries in skills/spockai/notify/teams-bot.ts
+- [x] T086 [US7] Implement notify teams-setup command in skills/spockai/notify/commands/teams-setup.ts
+- [x] T087 [US7] Implement notify channel command to switch Telegram/Teams in skills/spockai/notify/commands/channel.ts
+- [x] T088 [US7] Create Teams bot listener for bidirectional queries in skills/spockai/notify/teams-bot.ts
 
 ## Phase 10: Configuration and Polish
 

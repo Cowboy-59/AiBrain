@@ -19,19 +19,19 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Clone OpenClaw repository to project root
-- [ ] T002 Initialize pnpm workspace and install OpenClaw dependencies
-- [ ] T003 [P] Create SpockAI skills directory structure at ~/.openclaw/workspace/skills/spockai/
-- [ ] T004 [P] Configure TypeScript and ESLint for skills development
-- [ ] T005 [P] Create base configuration structure in ~/.openclaw/openclaw.json with spockai section
+- [x] T001 Clone OpenClaw repository to project root
+- [x] T002 Initialize pnpm workspace and install OpenClaw dependencies
+- [x] T003 [P] Create SpockAI skills directory structure at ~/.openclaw/workspace/skills/spockai/
+- [x] T004 [P] Configure TypeScript and ESLint for skills development
+- [x] T005 [P] Create base configuration structure in ~/.openclaw/openclaw.json with spockai section
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-- [ ] T006 Create shared types in skills/spockai/types/index.ts
-- [ ] T007 Create configuration loader in skills/spockai/config/loader.ts
-- [ ] T008 [P] Create credential encryption utility in skills/spockai/utils/crypto.ts
-- [ ] T009 [P] Create logging utility in skills/spockai/utils/logger.ts
-- [ ] T010 Create base skill class in skills/spockai/base/skill.ts
+- [x] T006 Create shared types in skills/spockai/types/index.ts
+- [x] T007 Create configuration loader in skills/spockai/config/loader.ts
+- [x] T008 [P] Create credential encryption utility in skills/spockai/utils/crypto.ts
+- [x] T009 [P] Create logging utility in skills/spockai/utils/logger.ts
+- [x] T010 Create base skill class in skills/spockai/base/skill.ts
 
 ## Phase 3: User Story 1 - Email Management [US1]
 
@@ -40,23 +40,23 @@
 
 ### Models
 
-- [ ] T011 [P] [US1] Create EmailAccount interface in skills/spockai/email/types.ts
-- [ ] T012 [P] [US1] Create Email interface in skills/spockai/email/types.ts
-- [ ] T013 [P] [US1] Create PriorityRule interface in skills/spockai/email/types.ts
+- [x] T011 [P] [US1] Create EmailAccount interface in skills/spockai/email/types.ts
+- [x] T012 [P] [US1] Create Email interface in skills/spockai/email/types.ts
+- [x] T013 [P] [US1] Create PriorityRule interface in skills/spockai/email/types.ts
 
 ### Services
 
-- [ ] T014 [US1] Create IMAP client wrapper in skills/spockai/email/imap-client.ts
+- [x] T014 [US1] Create IMAP client wrapper in skills/spockai/email/imap-client.ts
 - [ ] T015 [US1] Create Gmail OAuth handler in skills/spockai/email/gmail-auth.ts
 - [ ] T016 [US1] Create Outlook OAuth handler in skills/spockai/email/outlook-auth.ts
-- [ ] T017 [US1] Create EmailService with fetch/sync in skills/spockai/email/service.ts
-- [ ] T018 [US1] Create PriorityClassifier in skills/spockai/email/classifier.ts
+- [x] T017 [US1] Create EmailService with fetch/sync in skills/spockai/email/service.ts
+- [x] T018 [US1] Create PriorityClassifier in skills/spockai/email/classifier.ts
 
 ### Skill Commands
 
-- [ ] T019 [US1] Create spockai-email SKILL.md definition in skills/spockai/email/SKILL.md
-- [ ] T020 [US1] Implement email list command in skills/spockai/email/commands/list.ts
-- [ ] T021 [US1] Implement email accounts command in skills/spockai/email/commands/accounts.ts
+- [x] T019 [US1] Create spockai-email SKILL.md definition in skills/spockai/email/SKILL.md
+- [x] T020 [US1] Implement email list command in skills/spockai/email/commands/list.ts
+- [x] T021 [US1] Implement email accounts command in skills/spockai/email/commands/accounts.ts
 - [ ] T022 [US1] Implement email add command in skills/spockai/email/commands/add.ts
 - [ ] T023 [US1] Implement email remove command in skills/spockai/email/commands/remove.ts
 - [ ] T024 [US1] Implement email rules command in skills/spockai/email/commands/rules.ts

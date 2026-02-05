@@ -96,21 +96,21 @@
 
 ### Models
 
-- [ ] T036 [P] [US2] Create CalendarSource interface in skills/spockai/calendar/types.ts
-- [ ] T037 [P] [US2] Create Appointment interface in skills/spockai/calendar/types.ts
+- [x] T036 [P] [US2] Create CalendarSource interface in skills/spockai/calendar/types.ts
+- [x] T037 [P] [US2] Create Appointment interface in skills/spockai/calendar/types.ts
 
 ### Services
 
 - [ ] T038 [US2] Create Google Calendar client in skills/spockai/calendar/google-client.ts
 - [ ] T039 [US2] Create Microsoft Graph client in skills/spockai/calendar/microsoft-client.ts
-- [ ] T040 [US2] Create CalendarService with fetch/sync in skills/spockai/calendar/service.ts
+- [x] T040 [US2] Create CalendarService with fetch/sync in skills/spockai/calendar/service.ts
 
 ### Skill Commands
 
-- [ ] T041 [US2] Create spockai-calendar SKILL.md definition in skills/spockai/calendar/SKILL.md
-- [ ] T042 [US2] Implement calendar command in skills/spockai/calendar/commands/list.ts
-- [ ] T043 [US2] Implement calendar accounts command in skills/spockai/calendar/commands/accounts.ts
-- [ ] T044 [US2] Implement calendar add/remove commands in skills/spockai/calendar/commands/manage.ts
+- [x] T041 [US2] Create spockai-calendar SKILL.md definition in skills/spockai/calendar/SKILL.md
+- [x] T042 [US2] Implement calendar command in skills/spockai/calendar/commands/list.ts
+- [x] T043 [US2] Implement calendar accounts command in skills/spockai/calendar/commands/accounts.ts
+- [x] T044 [US2] Implement calendar add/remove commands in skills/spockai/calendar/commands/manage.ts
 
 ### Integration
 
@@ -123,21 +123,21 @@
 
 ### Models
 
-- [ ] T046 [P] [US3] Create BeansConfig interface in skills/spockai/beans/types.ts
-- [ ] T047 [P] [US3] Create Bean interface (hmans/beans YAML frontmatter format) in skills/spockai/beans/types.ts
+- [x] T046 [P] [US3] Create BeansConfig interface in skills/spockai/beans/types.ts
+- [x] T047 [P] [US3] Create Bean interface (hmans/beans YAML frontmatter format) in skills/spockai/beans/types.ts
 
 ### Services
 
-- [ ] T048 [US3] Create BeansParser with YAML frontmatter support using gray-matter in skills/spockai/beans/parser.ts
-- [ ] T049 [US3] Create BeansScanner with directory watching in skills/spockai/beans/scanner.ts
-- [ ] T050 [US3] Create BeansService in skills/spockai/beans/service.ts
+- [x] T048 [US3] Create BeansParser with YAML frontmatter support using gray-matter in skills/spockai/beans/parser.ts
+- [x] T049 [US3] Create BeansScanner with directory watching in skills/spockai/beans/scanner.ts
+- [x] T050 [US3] Create BeansService in skills/spockai/beans/service.ts
 
 ### Skill Commands
 
-- [ ] T051 [US3] Create spockai-beans SKILL.md definition in skills/spockai/beans/SKILL.md
-- [ ] T052 [US3] Implement beans command in skills/spockai/beans/commands/list.ts
-- [ ] T053 [US3] Implement beans scan command in skills/spockai/beans/commands/scan.ts
-- [ ] T054 [US3] Implement beans paths command in skills/spockai/beans/commands/paths.ts
+- [x] T051 [US3] Create spockai-beans SKILL.md definition in skills/spockai/beans/SKILL.md
+- [x] T052 [US3] Implement beans command in skills/spockai/beans/commands/list.ts
+- [x] T053 [US3] Implement beans scan command in skills/spockai/beans/commands/scan.ts
+- [x] T054 [US3] Implement beans paths command in skills/spockai/beans/commands/paths.ts
 
 ### Integration
 

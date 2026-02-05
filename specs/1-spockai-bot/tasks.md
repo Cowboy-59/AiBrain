@@ -47,8 +47,8 @@
 ### Services
 
 - [x] T014 [US1] Create IMAP client wrapper in skills/spockai/email/imap-client.ts
-- [ ] T015 [US1] Create Gmail OAuth handler in skills/spockai/email/gmail-auth.ts
-- [ ] T016 [US1] Create Outlook OAuth handler in skills/spockai/email/outlook-auth.ts
+- [x] T015 [US1] Create Gmail OAuth handler in skills/spockai/email/gmail-auth.ts
+- [x] T016 [US1] Create Outlook OAuth handler in skills/spockai/email/outlook-auth.ts
 - [x] T017 [US1] Create EmailService with fetch/sync in skills/spockai/email/service.ts
 - [x] T018 [US1] Create PriorityClassifier in skills/spockai/email/classifier.ts
 
@@ -57,9 +57,9 @@
 - [x] T019 [US1] Create spockai-email SKILL.md definition in skills/spockai/email/SKILL.md
 - [x] T020 [US1] Implement email list command in skills/spockai/email/commands/list.ts
 - [x] T021 [US1] Implement email accounts command in skills/spockai/email/commands/accounts.ts
-- [ ] T022 [US1] Implement email add command in skills/spockai/email/commands/add.ts
-- [ ] T023 [US1] Implement email remove command in skills/spockai/email/commands/remove.ts
-- [ ] T024 [US1] Implement email rules command in skills/spockai/email/commands/rules.ts
+- [x] T022 [US1] Implement email add command in skills/spockai/email/commands/add.ts
+- [x] T023 [US1] Implement email remove command in skills/spockai/email/commands/remove.ts
+- [x] T024 [US1] Implement email rules command in skills/spockai/email/commands/rules.ts
 
 ## Phase 4: User Story 4 - Telegram Notifications [US4]
 
@@ -68,21 +68,21 @@
 
 ### Models
 
-- [ ] T025 [P] [US4] Create NotificationConfig interface in skills/spockai/notify/types.ts
-- [ ] T026 [P] [US4] Create NotificationRule interface in skills/spockai/notify/types.ts
+- [x] T025 [P] [US4] Create NotificationConfig interface in skills/spockai/notify/types.ts
+- [x] T026 [P] [US4] Create NotificationRule interface in skills/spockai/notify/types.ts
 
 ### Services
 
-- [ ] T027 [US4] Create TelegramNotifier using grammY in skills/spockai/notify/telegram.ts
-- [ ] T028 [US4] Create NotificationService in skills/spockai/notify/service.ts
-- [ ] T029 [US4] Create NotificationQueue with rate limiting in skills/spockai/notify/queue.ts
+- [x] T027 [US4] Create TelegramNotifier using grammY in skills/spockai/notify/telegram.ts
+- [x] T028 [US4] Create NotificationService in skills/spockai/notify/service.ts
+- [x] T029 [US4] Create NotificationQueue with rate limiting in skills/spockai/notify/queue.ts
 
 ### Skill Commands
 
-- [ ] T030 [US4] Create spockai-notify SKILL.md definition in skills/spockai/notify/SKILL.md
-- [ ] T031 [US4] Implement notify status command in skills/spockai/notify/commands/status.ts
-- [ ] T032 [US4] Implement notify enable/disable commands in skills/spockai/notify/commands/toggle.ts
-- [ ] T033 [US4] Implement notify test command in skills/spockai/notify/commands/test.ts
+- [x] T030 [US4] Create spockai-notify SKILL.md definition in skills/spockai/notify/SKILL.md
+- [x] T031 [US4] Implement notify status command in skills/spockai/notify/commands/status.ts
+- [x] T032 [US4] Implement notify enable/disable commands in skills/spockai/notify/commands/toggle.ts
+- [x] T033 [US4] Implement notify test command in skills/spockai/notify/commands/test.ts
 
 ### Integration
 

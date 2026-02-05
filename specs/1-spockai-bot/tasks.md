@@ -177,20 +177,20 @@
 
 ### Models
 
-- [ ] T066 [P] [US6] Create ChatMessage interface in skills/spockai/chat/types.ts
-- [ ] T067 [P] [US6] Create ConversationContext interface in skills/spockai/chat/types.ts
-- [ ] T068 [P] [US6] Create ConfigurationIntent interface in skills/spockai/chat/types.ts
+- [x] T066 [P] [US6] Create ChatMessage interface in skills/spockai/chat/types.ts
+- [x] T067 [P] [US6] Create ConversationContext interface in skills/spockai/chat/types.ts
+- [x] T068 [P] [US6] Create ConfigurationIntent interface in skills/spockai/chat/types.ts
 
 ### Services
 
-- [ ] T069 [US6] Create ConversationEngine for natural language config in skills/spockai/chat/engine.ts
-- [ ] T070 [US6] Create IntentParser for detecting config requests in skills/spockai/chat/intent-parser.ts
-- [ ] T071 [US6] Create ConfigurationWizard for guided setup in skills/spockai/chat/wizard.ts
-- [ ] T072 [US6] Create ResponseFormatter for conversational output in skills/spockai/chat/formatter.ts
+- [x] T069 [US6] Create ConversationEngine for natural language config in skills/spockai/chat/engine.ts
+- [x] T070 [US6] Create IntentParser for detecting config requests in skills/spockai/chat/intent-parser.ts
+- [x] T071 [US6] Create ConfigurationWizard for guided setup in skills/spockai/chat/wizard.ts
+- [x] T072 [US6] Create ResponseFormatter for conversational output in skills/spockai/chat/formatter.ts
 
 ### UI Components
 
-- [ ] T073 [US6] Create Electron shell for dockable window in skills/spockai/chat/ui/app.ts
+- [x] T073 [US6] Create Electron shell for dockable window in skills/spockai/chat/ui/app.ts
 - [ ] T074 [US6] Implement window docking (snap to screen edges) in skills/spockai/chat/ui/docking.ts
 - [ ] T075 [US6] Create chat message display component in skills/spockai/chat/ui/messages.tsx
 - [ ] T076 [US6] Create input field with send button in skills/spockai/chat/ui/input.tsx
@@ -198,9 +198,9 @@
 
 ### Skill Commands
 
-- [ ] T078 [US6] Create spockai-chat SKILL.md definition in skills/spockai/chat/SKILL.md
-- [ ] T079 [US6] Implement chat open command to launch window in skills/spockai/chat/commands/open.ts
-- [ ] T080 [US6] Implement chat close command in skills/spockai/chat/commands/close.ts
+- [x] T078 [US6] Create spockai-chat SKILL.md definition in skills/spockai/chat/SKILL.md
+- [x] T079 [US6] Implement chat open command to launch window in skills/spockai/chat/commands/open.ts
+- [x] T080 [US6] Implement chat close command in skills/spockai/chat/commands/close.ts
 
 ## Phase 9: User Story 7 - Teams Integration [US7]
 

@@ -86,8 +86,8 @@
 
 ### Integration
 
-- [ ] T034 [US4] Wire email high-priority events to NotificationService in skills/spockai/email/service.ts
-- [ ] T035 [US4] Add background polling for new emails with notification triggers
+- [x] T034 [US4] Wire email high-priority events to NotificationService in skills/spockai/core/integration.ts
+- [x] T035 [US4] Add background polling for new emails with notification triggers
 
 ## Phase 5: User Story 2 - Calendar Integration [US2]
 
@@ -114,7 +114,7 @@
 
 ### Integration
 
-- [ ] T045 [US2] Wire calendar reminders to NotificationService
+- [x] T045 [US2] Wire calendar reminders to NotificationService
 
 ## Phase 6: User Story 3 - BEANS File Scanning [US3]
 
@@ -141,7 +141,7 @@
 
 ### Integration
 
-- [ ] T055 [US3] Wire beans priority 1 items to NotificationService
+- [x] T055 [US3] Wire beans priority 1 items to NotificationService
 
 ## Phase 7: User Story 5 - External Services [US5]
 

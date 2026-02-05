@@ -113,6 +113,7 @@ export class ModuleLogger {
 }
 
 // Pre-configured loggers for common modules
+export const coreLogger = new ModuleLogger('core');
 export const emailLogger = new ModuleLogger('email');
 export const calendarLogger = new ModuleLogger('calendar');
 export const beansLogger = new ModuleLogger('beans');

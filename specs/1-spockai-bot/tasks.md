@@ -150,25 +150,25 @@
 
 ### Models
 
-- [ ] T056 [P] [US5] Create ExternalService interface in skills/spockai/services/types.ts
-- [ ] T057 [P] [US5] Create ServiceRequest interface in skills/spockai/services/types.ts
+- [x] T056 [P] [US5] Create ExternalService interface in skills/spockai/services/types.ts
+- [x] T057 [P] [US5] Create ServiceRequest interface in skills/spockai/services/types.ts
 
 ### Services
 
-- [ ] T058 [US5] Create SamanageClient in skills/spockai/services/samanage-client.ts
-- [ ] T059 [US5] Create MondayClient in skills/spockai/services/monday-client.ts
-- [ ] T060 [US5] Create ExternalServicesService in skills/spockai/services/service.ts
+- [x] T058 [US5] Create SamanageClient in skills/spockai/services/samanage-client.ts
+- [x] T059 [US5] Create MondayClient in skills/spockai/services/monday-client.ts
+- [x] T060 [US5] Create ExternalServicesService in skills/spockai/services/service.ts
 
 ### Skill Commands
 
-- [ ] T061 [US5] Create spockai-services SKILL.md definition in skills/spockai/services/SKILL.md
-- [ ] T062 [US5] Implement services command in skills/spockai/services/commands/list.ts
-- [ ] T063 [US5] Implement samanage command in skills/spockai/services/commands/samanage.ts
-- [ ] T064 [US5] Implement monday command in skills/spockai/services/commands/monday.ts
+- [x] T061 [US5] Create spockai-services SKILL.md definition in skills/spockai/services/SKILL.md
+- [x] T062 [US5] Implement services command in skills/spockai/services/commands/list.ts
+- [x] T063 [US5] Implement samanage command in skills/spockai/services/commands/samanage.ts
+- [x] T064 [US5] Implement monday command in skills/spockai/services/commands/monday.ts
 
 ### Integration
 
-- [ ] T065 [US5] Wire external service updates to NotificationService
+- [x] T065 [US5] Wire external service updates to NotificationService
 
 ## Phase 8: User Story 6 - Conversational Chat Interface [US6]
 

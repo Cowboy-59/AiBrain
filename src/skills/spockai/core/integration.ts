@@ -8,21 +8,25 @@ import type { NotificationService } from '../notify/service.js';
 import type { EmailService } from '../email/service.js';
 import type { CalendarService } from '../calendar/service.js';
 import type { BeansService } from '../beans/service.js';
+import type { ExternalServicesService } from '../services/service.js';
 import type { Email } from '../email/types.js';
 import type { Appointment } from '../calendar/types.js';
 import type { PriorityItem } from '../beans/types.js';
+import type { ServiceRequest } from '../services/types.js';
 import { coreLogger } from '../utils/logger.js';
 
 interface IntegrationConfig {
   emailPollingInterval: number;   // Minutes between email polling
   calendarReminderLead: number;   // Minutes before event to send reminder
   beansPollingInterval: number;   // Minutes between BEANS scans
+  servicesPollingInterval: number; // Minutes between external service syncs
 }
 
 const DEFAULT_CONFIG: IntegrationConfig = {
   emailPollingInterval: 5,
   calendarReminderLead: 15,
-  beansPollingInterval: 30
+  beansPollingInterval: 30,
+  servicesPollingInterval: 15
 };
 
 /**
@@ -35,13 +39,16 @@ export class IntegrationManager {
   private emailService: EmailService | null = null;
   private calendarService: CalendarService | null = null;
   private beansService: BeansService | null = null;
+  private servicesService: ExternalServicesService | null = null;
 
   private emailPollInterval: NodeJS.Timeout | null = null;
   private calendarReminderInterval: NodeJS.Timeout | null = null;
   private beansPollInterval: NodeJS.Timeout | null = null;
+  private servicesPollInterval: NodeJS.Timeout | null = null;
 
   private seenEmailIds: Set<string> = new Set();
   private seenBeanIds: Set<string> = new Set();
+  private seenRequestIds: Set<string> = new Set();
 
   constructor(config: Partial<IntegrationConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -77,6 +84,14 @@ export class IntegrationManager {
   wireBeansService(service: BeansService): void {
     this.beansService = service;
     coreLogger.info('BEANS service wired to notifications');
+  }
+
+  /**
+   * Register and wire external services (T065)
+   */
+  wireServicesService(service: ExternalServicesService): void {
+    this.servicesService = service;
+    coreLogger.info('External services wired to notifications');
   }
 
   /**
@@ -178,6 +193,39 @@ export class IntegrationManager {
   }
 
   /**
+   * Start external services polling (T065)
+   */
+  startServicesPolling(): void {
+    if (this.servicesPollInterval) {
+      return;
+    }
+
+    const intervalMs = this.config.servicesPollingInterval * 60 * 1000;
+
+    this.servicesPollInterval = setInterval(async () => {
+      await this.pollServices();
+    }, intervalMs);
+
+    coreLogger.info('External services polling started', {
+      intervalMinutes: this.config.servicesPollingInterval
+    });
+
+    // Run immediately
+    void this.pollServices();
+  }
+
+  /**
+   * Stop external services polling
+   */
+  stopServicesPolling(): void {
+    if (this.servicesPollInterval) {
+      clearInterval(this.servicesPollInterval);
+      this.servicesPollInterval = null;
+      coreLogger.info('External services polling stopped');
+    }
+  }
+
+  /**
    * Start all polling
    */
   startAll(): void {
@@ -190,6 +238,9 @@ export class IntegrationManager {
     if (this.beansService) {
       this.startBeansPolling();
     }
+    if (this.servicesService) {
+      this.startServicesPolling();
+    }
   }
 
   /**
@@ -199,6 +250,7 @@ export class IntegrationManager {
     this.stopEmailPolling();
     this.stopCalendarReminders();
     this.stopBeansPolling();
+    this.stopServicesPolling();
   }
 
   /**
@@ -359,6 +411,69 @@ export class IntegrationManager {
 
     await this.notificationService.notify(payload);
     coreLogger.info('Priority 1 bean notification sent', { beanId: item.id });
+  }
+
+  private async pollServices(): Promise<void> {
+    if (!this.servicesService || !this.notificationService) {
+      return;
+    }
+
+    try {
+      coreLogger.debug('Polling external services');
+
+      // Sync all services
+      await this.servicesService.syncAllServices();
+
+      // Get high-priority requests
+      const highPriorityRequests = this.servicesService.getRequests({
+        priority: 'high',
+        limit: 20
+      });
+
+      // Send notifications for new high-priority requests
+      for (const request of highPriorityRequests) {
+        if (!this.seenRequestIds.has(request.id)) {
+          this.seenRequestIds.add(request.id);
+          await this.notifyServiceRequest(request);
+        }
+      }
+    } catch (error) {
+      coreLogger.error('External services polling failed', { error });
+    }
+  }
+
+  private async notifyServiceRequest(request: ServiceRequest): Promise<void> {
+    if (!this.notificationService) return;
+
+    // Determine notification type based on service
+    const service = this.servicesService?.getServices().find(s => s.id === request.serviceId);
+    const notificationType = service?.provider === 'samanage'
+      ? 'samanage_new_request'
+      : 'monday_update';
+
+    let message = `**${request.title}**\n`;
+    message += `Status: ${request.status.replace(/_/g, ' ')}\n`;
+    if (request.assigneeName) {
+      message += `Assignee: ${request.assigneeName}\n`;
+    }
+    if (request.category) {
+      message += `Category: ${request.category}`;
+    }
+
+    const payload: NotificationPayload = {
+      type: notificationType,
+      title: service?.provider === 'samanage' ? '🔧 New Samanage Request' : '📋 Monday.com Update',
+      message,
+      priority: request.priority,
+      sourceId: request.id,
+      timestamp: request.updatedAt
+    };
+
+    await this.notificationService.notify(payload);
+    coreLogger.info('External service notification sent', {
+      requestId: request.id,
+      provider: service?.provider
+    });
   }
 }
 

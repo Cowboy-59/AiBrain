@@ -1,0 +1,27 @@
+═══════════════════════════════════════════════════════
+           SpockAI Integration Test Suite              
+═══════════════════════════════════════════════════════
+Started: 2026-02-05T13:56:10.859Z
+Config: {"skipEmail":false,"skipCalendar":false,"skipBeans":false,"skipNotifications":false,"skipServices":false,"verbose":false}
+
+▶ Running: Configuration Loading
+    Config loaded successfully
+  ✓ PASSED (6ms)
+
+▶ Running: Logger Initialization
+    Logger initialized
+  ✓ PASSED (0ms)
+
+▶ Running: Error Handling
+    Error handling utilities working
+  ✓ PASSED (3ms)
+
+▶ Running: Health Check Manager
+    Health check manager working
+  ✓ PASSED (3ms)
+
+▶ Running: Resource Monitor
+    Resource monitor working (Memory: 85.7MB)
+  ✓ PASSED (3ms)
+
+▶ Running: Recovery Manager

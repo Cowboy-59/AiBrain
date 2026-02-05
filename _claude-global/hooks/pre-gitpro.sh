@@ -19,13 +19,11 @@ if [ "$SKILL_NAME" != "gitpro" ]; then
     exit 0
 fi
 
-# Check operation type from args
-SKILL_ARGS=$(echo "$TOOL_INPUT" | jq -r '.args // ""')
-
-# Checkpoint skips full validation (speed over compliance)
-if echo "$SKILL_ARGS" | grep -qi "checkpoint"; then
-    echo "Pre-gitpro: Checkpoint operation - skipping full validation" >&2
-    exit 0
+# Create token for git-guard bypass
+SESSION_ID=$(echo "$INPUT" | jq -r '.session_id')
+if [ -n "$SESSION_ID" ]; then
+    TOKEN_FILE="/tmp/.gitpro-token-${SESSION_ID}"
+    date +%s > "$TOKEN_FILE"
 fi
 
 # Output helper

@@ -11,10 +11,17 @@ All notable changes to the Claude Project Starter Kit will be documented here.
 
 ---
 
+### February 5, 2026
+
+- **✨ SpockAI Implementation Complete** - Full implementation of SpockAI personal assistant bot with 102 tasks, 68 TypeScript files, 7 skills (email, calendar, beans, notify, services, chat, config), and 13 passing integration tests
+
+### February 4, 2026
+
+- **✨ SpockAI Bot Specification** - Complete spec-driven development workflow including research, data model, contracts, and 102 implementation tasks with clarifications
+
 ### February 3, 2026
 - **✨ Python Pre-Commit Validation** - pre-gitpro hook now runs pyright/mypy type checking for Python projects
 - **✨ Language-Aware Rule Sync** - sync-starter-kit detects project type and uses -py.md rule variants for Python projects
-
 - **✨ Python Support** - sync-starter-kit and gitpro now detect and support Python projects
 - **✨ Beads Integration** - Issue tracking with merge driver and starter kit template
 - **✨ CLAUDE.md Template** - Interactive creation from starter kit during sync

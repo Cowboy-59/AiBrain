@@ -1,0 +1,49 @@
+{
+  "$schema": "./config.schema.json",
+  "spockai": {
+    "notifications": {
+      "channel": "telegram",
+      "telegram": {
+        "botToken": "",
+        "chatId": ""
+      },
+      "teams": {
+        "webhookUrl": "",
+        "channelId": "",
+        "tenantId": "",
+        "botAppId": "",
+        "botAppSecret": ""
+      },
+      "digestInterval": 5,
+      "rules": []
+    },
+    "email": {
+      "accounts": [],
+      "globalRules": {
+        "vipSenders": [],
+        "priorityKeywords": ["URGENT", "ACTION REQUIRED", "CRITICAL", "ASAP", "IMMEDIATE"]
+      },
+      "syncInterval": 5
+    },
+    "calendar": {
+      "sources": [],
+      "defaultWindow": "today"
+    },
+    "beans": {
+      "scanPaths": [],
+      "scanInterval": 5,
+      "enabled": true
+    },
+    "services": {
+      "samanage": {
+        "enabled": false,
+        "baseUrl": "",
+        "apiKey": ""
+      },
+      "monday": {
+        "enabled": false,
+        "apiToken": ""
+      }
+    }
+  }
+}

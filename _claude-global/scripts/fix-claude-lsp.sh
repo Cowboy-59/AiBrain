@@ -28,13 +28,17 @@ print_error() { echo -e "${RED}✗${NC} $1"; }
 
 find_cli_path() {
     local locations=(
+        # Windows (npm global) - check first for Windows users
+        "${APPDATA:-$HOME/AppData/Roaming}/npm/node_modules/@anthropic-ai/claude-code/cli.js"
+        # Windows (LOCALAPPDATA)
+        "${LOCALAPPDATA:-$HOME/AppData/Local}/npm/node_modules/@anthropic-ai/claude-code/cli.js"
         # Homebrew (Apple Silicon)
         "/opt/homebrew/lib/node_modules/@anthropic-ai/claude-code/cli.js"
         # Homebrew (Intel)
         "/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js"
         # Native install
         "$HOME/.claude/local/node_modules/@anthropic-ai/claude-code/cli.js"
-        # npm global
+        # npm global (Linux/Mac)
         "/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js"
         "$(npm root -g 2>/dev/null)/@anthropic-ai/claude-code/cli.js"
     )

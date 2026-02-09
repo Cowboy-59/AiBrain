@@ -39,7 +39,7 @@ function Find-NodeJs {
 
 # Get SpockAI path
 function Get-SpockAiPath {
-    $skillsPath = Join-Path $env:USERPROFILE ".openclaw\workspace\skills\spockai"
+    $skillsPath = Join-Path $env:USERPROFILE ".spockai\skills\spockai"
     if (Test-Path $skillsPath) {
         return $skillsPath
     }

@@ -3,17 +3,20 @@
  * Provides structured logging with Pino
  */
 
-import pino from 'pino';
+import pino, { type Logger, type LoggerOptions, type TransportMultiOptions } from 'pino';
 import { join } from 'path';
 import { homedir } from 'os';
 
-const LOG_DIR = join(homedir(), '.openclaw', 'logs');
+// Type helper for pino function call
+type PinoFn = (opts?: LoggerOptions, stream?: pino.DestinationStream) => Logger;
+
+const LOG_DIR = join(homedir(), '.spockai', 'logs');
 
 // Determine log level from environment
 const LOG_LEVEL = process.env['SPOCKAI_LOG_LEVEL'] || process.env['LOG_LEVEL'] || 'info';
 
 // Create base logger configuration
-const baseConfig: pino.LoggerOptions = {
+const baseConfig: LoggerOptions = {
   level: LOG_LEVEL,
   formatters: {
     level: (label) => ({ level: label }),
@@ -27,7 +30,7 @@ const baseConfig: pino.LoggerOptions = {
 };
 
 // Create transport configuration based on environment
-function createTransport(): pino.TransportMultiOptions | undefined {
+function createTransport(): TransportMultiOptions | undefined {
   if (process.env['NODE_ENV'] === 'production') {
     // In production, log to file
     return {
@@ -64,50 +67,49 @@ function createTransport(): pino.TransportMultiOptions | undefined {
 
 // Create the logger instance
 const transport = createTransport();
+const pinoFn = pino as unknown as PinoFn;
 export const logger = transport
-  ? pino(baseConfig, pino.transport(transport))
-  : pino(baseConfig);
+  ? pinoFn(baseConfig, pino.transport(transport))
+  : pinoFn(baseConfig);
 
 // Child logger factory for specific modules
-export function createChildLogger(module: string): pino.Logger {
+export function createChildLogger(module: string): Logger {
   return logger.child({ module });
 }
 
-// Utility type for log context
-export interface LogContext {
-  [key: string]: unknown;
-}
+// Utility type for log context - accepts any object
+export type LogContext = Record<string, unknown>;
 
 // Convenience wrapper class for module-specific logging
 export class ModuleLogger {
-  private childLogger: pino.Logger;
+  private childLogger: Logger;
 
   constructor(module: string) {
     this.childLogger = createChildLogger(module);
   }
 
-  debug(message: string, context?: LogContext): void {
+  debug(message: string, context?: object): void {
     this.childLogger.debug(context ?? {}, message);
   }
 
-  info(message: string, context?: LogContext): void {
+  info(message: string, context?: object): void {
     this.childLogger.info(context ?? {}, message);
   }
 
-  warn(message: string, context?: LogContext): void {
+  warn(message: string, context?: object): void {
     this.childLogger.warn(context ?? {}, message);
   }
 
-  error(message: string, context?: LogContext): void {
+  error(message: string, context?: object): void {
     this.childLogger.error(context ?? {}, message);
   }
 
-  fatal(message: string, context?: LogContext): void {
+  fatal(message: string, context?: object): void {
     this.childLogger.fatal(context ?? {}, message);
   }
 
   // Create a child logger with additional context
-  child(bindings: Record<string, unknown>): pino.Logger {
+  child(bindings: Record<string, unknown>): Logger {
     return this.childLogger.child(bindings);
   }
 }

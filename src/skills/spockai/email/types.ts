@@ -3,7 +3,7 @@
  * Type definitions for email management functionality
  */
 
-import type { Priority, BaseEntity, OAuthCredentials } from '../types/index.js';
+import type { Priority, BaseEntity } from '../types/index.js';
 
 // Email provider types
 export type EmailProvider = 'gmail' | 'outlook' | 'imap';
@@ -42,6 +42,7 @@ export interface Email extends BaseEntity {
   messageId: string;
   subject: string;
   sender: string;
+  senderName?: string;
   senderEmail: string;
   recipients: string[];
   receivedAt: Date;
@@ -94,6 +95,7 @@ export interface EmailFilterOptions {
   accountId?: string;
   priority?: Priority;
   isRead?: boolean;
+  unreadOnly?: boolean;
   dateFrom?: Date;
   dateTo?: Date;
   sender?: string;

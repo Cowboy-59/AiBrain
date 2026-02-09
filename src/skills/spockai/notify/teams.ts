@@ -57,7 +57,7 @@ export class TeamsNotifier implements Notifier {
    * Check if connected
    */
   isConnected(): boolean {
-    return this.connected && this.config.enabled;
+    return this.connected && (this.config.enabled ?? true);
   }
 
   /**

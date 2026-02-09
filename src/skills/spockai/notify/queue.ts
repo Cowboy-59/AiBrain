@@ -6,7 +6,6 @@
 import type {
   NotificationPayload,
   QueuedNotification,
-  DigestNotification,
   NotificationSendResult,
   Notifier
 } from './types.js';
@@ -25,7 +24,6 @@ export class NotificationQueue {
   private notifier: Notifier | null = null;
   private digestInterval: number; // minutes
   private digestTimer: NodeJS.Timeout | null = null;
-  private processingTimer: NodeJS.Timeout | null = null;
   private isProcessing: boolean = false;
 
   constructor(digestInterval: number = 5) {
@@ -139,16 +137,10 @@ export class NotificationQueue {
     const items = [...this.digestBuffer];
     this.digestBuffer = [];
 
-    const digest: DigestNotification = {
-      items,
-      digestStart: items[0]?.timestamp ?? new Date(),
-      digestEnd: items[items.length - 1]?.timestamp ?? new Date()
-    };
-
     notifyLogger.info('Sending digest notification', { itemCount: items.length });
 
     try {
-      const result = await this.notifier.sendDigest(digest);
+      const result = await this.notifier.sendDigest(items);
       return result;
     } catch (error) {
       notifyLogger.error('Failed to send digest', { error });

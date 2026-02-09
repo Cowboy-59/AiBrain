@@ -23,7 +23,7 @@ export async function showCommand(
 ): Promise<CommandResult<ShowResult>> {
   try {
     const section = (args[0]?.toLowerCase() || 'all') as ConfigSection;
-    const fullConfig = context.config;
+    const fullConfig = context.config as unknown as Record<string, unknown>;
 
     let configToShow: Record<string, unknown>;
     let sectionTitle: string;

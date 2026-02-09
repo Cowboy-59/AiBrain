@@ -14,7 +14,7 @@ import type {
 } from './types.js';
 import type { NotificationEventType } from '../types/index.js';
 import { TelegramNotifier, createTelegramNotifier } from './telegram.js';
-import { TeamsNotifier, createTeamsNotifier } from './teams.js';
+import { createTeamsNotifier } from './teams.js';
 import { NotificationQueue, createNotificationQueue } from './queue.js';
 import { notifyLogger } from '../utils/logger.js';
 import { randomUUID } from 'crypto';

@@ -52,8 +52,8 @@
 ## Configuration File Location
 
 SpockAI configuration is stored in:
-- **Linux/macOS**: `~/.openclaw/openclaw.json`
-- **Windows**: `%USERPROFILE%\.openclaw\openclaw.json`
+- **Linux/macOS**: `~/.spockai/config.json`
+- **Windows**: `%USERPROFILE%\.spockai\config.json`
 
 ## Configuration Structure
 
@@ -94,7 +94,7 @@ SpockAI configuration is stored in:
 ## Backup Storage
 
 Backups are stored in:
-- `~/.openclaw/backups/spockai-{timestamp}.json`
+- `~/.spockai/backups/spockai-{timestamp}.json`
 
 ## Security Notes
 

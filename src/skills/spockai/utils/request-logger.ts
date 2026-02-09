@@ -110,14 +110,15 @@ export class RequestLogger {
       entry.body = this.sanitizeBody(options.body);
     }
 
-    coreLogger.debug('Outgoing request', {
+    const logContext: Record<string, unknown> = {
       requestId,
       service,
       method: entry.method,
-      url: entry.url,
-      ...(entry.headers && { headers: entry.headers }),
-      ...(entry.body && { body: entry.body })
-    });
+      url: entry.url
+    };
+    if (entry.headers) logContext.headers = entry.headers;
+    if (entry.body) logContext.body = entry.body;
+    coreLogger.debug('Outgoing request', logContext);
 
     return requestId;
   }
@@ -159,14 +160,15 @@ export class RequestLogger {
 
     const logLevel = statusCode >= 400 ? 'warn' : 'debug';
 
-    coreLogger[logLevel]('Response received', {
+    const logContext: Record<string, unknown> = {
       requestId,
       service,
       statusCode,
-      durationMs,
-      ...(entry.headers && { headers: entry.headers }),
-      ...(entry.body && { body: entry.body })
-    });
+      durationMs
+    };
+    if (entry.headers) logContext.headers = entry.headers;
+    if (entry.body) logContext.body = entry.body;
+    coreLogger[logLevel]('Response received', logContext);
   }
 
   /**
@@ -273,7 +275,7 @@ export class RequestLogger {
    * Create a fetch wrapper with automatic logging
    */
   createLoggingFetch(service: string): typeof fetch {
-    return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    return async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
       const url = typeof input === 'string' ? input : input.toString();
       const method = init?.method || 'GET';
       const startTime = Date.now();

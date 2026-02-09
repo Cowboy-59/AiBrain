@@ -7,7 +7,6 @@ import type { CommandResult } from '../../types/index.js';
 import type { CommandContext } from '../../base/skill.js';
 import type { EmailAccount, EmailProvider } from '../types.js';
 import { EmailService } from '../service.js';
-import { randomUUID } from 'crypto';
 
 let emailService: EmailService | null = null;
 

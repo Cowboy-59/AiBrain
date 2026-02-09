@@ -6,7 +6,7 @@
  * requires additional setup (electron-builder, etc.)
  */
 
-import type { WindowPosition, QuickAction, TrayAction } from '../types.js';
+import type { WindowPosition, QuickAction } from '../types.js';
 import { chatLogger } from '../../utils/logger.js';
 
 // Window configuration

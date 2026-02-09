@@ -45,8 +45,6 @@ export class HealthCheckManager {
   private checks: Map<string, HealthCheck> = new Map();
   private checkFunctions: Map<string, () => Promise<HealthCheck>> = new Map();
   private checkInterval: NodeJS.Timeout | null = null;
-  private recoveryManager?: RecoveryManager;
-  private resourceMonitor?: ResourceMonitor;
 
   constructor(config: Partial<HealthCheckConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -59,7 +57,6 @@ export class HealthCheckManager {
    * Set recovery manager for health checking
    */
   setRecoveryManager(manager: RecoveryManager): void {
-    this.recoveryManager = manager;
     this.registerCheck('recovery', async () => {
       const state = manager.getState();
       return {
@@ -77,7 +74,6 @@ export class HealthCheckManager {
    * Set resource monitor for health checking
    */
   setResourceMonitor(monitor: ResourceMonitor): void {
-    this.resourceMonitor = monitor;
     this.registerCheck('resources', async () => {
       const metrics = monitor.getMetrics();
       const memoryOk = metrics.memoryUsageMB < 100;

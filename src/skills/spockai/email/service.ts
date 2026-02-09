@@ -11,7 +11,7 @@ import type {
   EmailAccountStatus,
   GlobalEmailRules
 } from './types.js';
-import type { Priority } from '../types/index.js';
+// Priority type imported from types
 import { ImapClient, createImapClient } from './imap-client.js';
 import { PriorityClassifier } from './classifier.js';
 import { emailLogger } from '../utils/logger.js';
@@ -149,9 +149,11 @@ export class EmailService {
       };
 
       emailLogger.info('Email sync complete', {
-        accountId,
+        id: accountId,
         duration: Date.now() - startTime,
-        ...result
+        newEmails: result.newEmails,
+        totalEmails: result.totalEmails,
+        highPriority: result.highPriority
       });
 
       return result;

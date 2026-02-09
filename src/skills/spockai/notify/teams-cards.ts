@@ -8,7 +8,6 @@ import type {
   AdaptiveCardElement,
   AdaptiveCardAction,
   TextBlock,
-  ColumnSet,
   FactSet,
   Container
 } from './teams-types.js';
@@ -66,12 +65,7 @@ export class TeamsAdaptiveCardBuilder {
     type: 'info' | 'success' | 'warning' | 'error' = 'info',
     url?: string
   ): AdaptiveCard {
-    const colorMap = {
-      info: 'accent',
-      success: 'good',
-      warning: 'warning',
-      error: 'attention'
-    } as const;
+    // Color map reserved for future use: { info: 'accent', success: 'good', warning: 'warning', error: 'attention' }
 
     const iconMap = {
       info: 'ℹ️',
@@ -107,11 +101,7 @@ export class TeamsAdaptiveCardBuilder {
     priority: 'high' | 'medium' | 'low',
     url?: string
   ): AdaptiveCard {
-    const priorityColors = {
-      high: 'attention',
-      medium: 'warning',
-      low: 'default'
-    } as const;
+    // Priority colors reserved for future use: { high: 'attention', medium: 'warning', low: 'default' }
 
     const elements: AdaptiveCardElement[] = [
       this.buildTextBlock('📧 High-Priority Email', 'large', 'bolder'),

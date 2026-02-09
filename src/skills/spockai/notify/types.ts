@@ -21,6 +21,7 @@ export interface TeamsConfig {
   tenantId?: string;
   botAppId?: string;
   botAppSecret?: string;
+  enabled?: boolean;
 }
 
 // Notification rule
@@ -52,6 +53,8 @@ export interface NotificationPayload {
   message: string;
   priority?: Priority;
   timestamp: Date;
+  sourceId?: string;
+  url?: string;
   data?: Record<string, unknown>;
   actions?: NotificationAction[];
 }
@@ -108,7 +111,7 @@ export type NotificationListener = (payload: NotificationPayload) => void | Prom
 // Notifier interface (implemented by Telegram, Teams)
 export interface Notifier {
   send(payload: NotificationPayload): Promise<NotificationSendResult>;
-  sendDigest(digest: DigestNotification): Promise<NotificationSendResult>;
+  sendDigest(notifications: NotificationPayload[]): Promise<NotificationSendResult>;
   isConnected(): boolean;
   connect(): Promise<void>;
   disconnect(): Promise<void>;

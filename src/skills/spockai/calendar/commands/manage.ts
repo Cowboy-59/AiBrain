@@ -44,7 +44,7 @@ export async function addCommand(
       credentials: {
         accessToken: '',
         refreshToken: '',
-        expiresAt: new Date()
+        tokenExpiry: new Date()
       },
       isShared: false,
       enabled: false // Disabled until OAuth completes

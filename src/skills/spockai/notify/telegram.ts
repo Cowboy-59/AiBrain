@@ -8,7 +8,6 @@ import type {
   TelegramConfig,
   NotificationPayload,
   NotificationSendResult,
-  DigestNotification,
   Notifier
 } from './types.js';
 import { notifyLogger } from '../utils/logger.js';
@@ -86,7 +85,7 @@ export class TelegramNotifier implements Notifier {
 
       const result = await this.bot.api.sendMessage(this.config.chatId, message, {
         parse_mode: 'Markdown',
-        disable_web_page_preview: true
+        link_preview_options: { is_disabled: true }
       });
 
       notifyLogger.info('Telegram notification sent', {
@@ -114,7 +113,7 @@ export class TelegramNotifier implements Notifier {
   /**
    * Send a digest notification
    */
-  async sendDigest(digest: DigestNotification): Promise<NotificationSendResult> {
+  async sendDigest(notifications: NotificationPayload[]): Promise<NotificationSendResult> {
     if (!this.bot || !this.connected) {
       return {
         success: false,
@@ -123,17 +122,24 @@ export class TelegramNotifier implements Notifier {
       };
     }
 
+    if (notifications.length === 0) {
+      return {
+        success: true,
+        timestamp: new Date()
+      };
+    }
+
     try {
-      const message = this.formatDigest(digest);
+      const message = this.formatDigest(notifications);
 
       const result = await this.bot.api.sendMessage(this.config.chatId, message, {
         parse_mode: 'Markdown',
-        disable_web_page_preview: true
+        link_preview_options: { is_disabled: true }
       });
 
       notifyLogger.info('Telegram digest sent', {
         messageId: result.message_id,
-        itemCount: digest.items.length
+        itemCount: notifications.length
       });
 
       return {
@@ -192,14 +198,15 @@ export class TelegramNotifier implements Notifier {
   /**
    * Format digest to Telegram message
    */
-  private formatDigest(digest: DigestNotification): string {
-    const itemCount = digest.items.length;
+  private formatDigest(notifications: NotificationPayload[]): string {
+    const itemCount = notifications.length;
+    const now = new Date();
     let message = `📋 *SpockAI Digest* (${itemCount} items)\n`;
-    message += `_${this.formatTime(digest.digestStart)} - ${this.formatTime(digest.digestEnd)}_\n\n`;
+    message += `_${this.formatTime(now)}_\n\n`;
 
     // Group by type
     const byType = new Map<string, NotificationPayload[]>();
-    for (const item of digest.items) {
+    for (const item of notifications) {
       const existing = byType.get(item.type) ?? [];
       existing.push(item);
       byType.set(item.type, existing);

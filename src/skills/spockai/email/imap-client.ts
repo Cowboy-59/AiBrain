@@ -82,7 +82,7 @@ export class ImapClient {
     const maxResults = options.maxResults ?? 50;
 
     return new Promise((resolve, reject) => {
-      this.connection!.openBox('INBOX', true, (err, box) => {
+      this.connection!.openBox('INBOX', true, (err, _box) => {
         if (err) {
           emailLogger.error('Failed to open INBOX', { error: err.message });
           reject(err);
@@ -171,7 +171,7 @@ export class ImapClient {
         subject: parsed.subject ?? '(No Subject)',
         sender: senderAddress.name ?? senderAddress.address ?? 'Unknown',
         senderEmail: senderAddress.address ?? 'unknown@unknown.com',
-        recipients: parsed.to?.value.map(r => r.address ?? '') ?? [],
+        recipients: (Array.isArray(parsed.to) ? parsed.to[0]?.value : parsed.to?.value)?.map((r: { address?: string }) => r.address ?? '') ?? [],
         receivedAt: parsed.date ?? new Date(),
         priority: 'low', // Will be classified later
         isRead: false,

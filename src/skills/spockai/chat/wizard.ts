@@ -7,7 +7,6 @@ import type {
   WizardStep,
   WizardDefinition,
   IntentType,
-  ConfigurationIntent,
   ConversationContext
 } from './types.js';
 import { chatLogger } from '../utils/logger.js';
@@ -173,7 +172,8 @@ export class ConfigurationWizard {
       steps: NOTIFICATION_WIZARD_STEPS,
       onComplete: async (data) => {
         const action = data.enabled ? 'enabled' : 'disabled';
-        return `${data.notificationType.replace(/_/g, ' ')} notifications have been ${action}.`;
+        const notificationType = String(data.notificationType ?? 'notification');
+        return `${notificationType.replace(/_/g, ' ')} notifications have been ${action}.`;
       }
     });
 
@@ -188,7 +188,7 @@ export class ConfigurationWizard {
     this.registerWizard({
       intentType: 'connect_monday',
       steps: MONDAY_WIZARD_STEPS,
-      onComplete: async (data) => {
+      onComplete: async () => {
         return `Monday.com connected! I'll start syncing your boards and items.`;
       }
     });

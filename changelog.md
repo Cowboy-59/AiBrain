@@ -11,6 +11,14 @@ All notable changes to the Claude Project Starter Kit will be documented here.
 
 ---
 
+### February 8, 2026
+- **✨ SpockAI Phases 1-4** - Memory system, scheduled check-ins, email triage, Second Brain, session logging, voice/image, scratch pad, defer, web interface, context monitoring, subagents, mobile app
+
+- **✨ SpockAI Phases 1-4** - Memory system (daily logs, MEMORY.md, USER.md), scheduled check-ins (7am/12pm/5pm/8pm), email triage rules, Second Brain knowledge base, session logging, voice transcription, image analysis, scratch pad, defer system, web interface (port 3000), context monitoring, subagent orchestration
+- **✨ Mobile App** - React Native + Expo foundation with chat, reminders, settings screens
+- **♻️ Remove OpenClaw** - Migrate all paths from `~/.openclaw/` to `~/.spockai/`, delete stale dist/ artifacts
+- **🔧 Config Loader** - Load config from `~/.spockai/config.json` at startup
+
 ### February 5, 2026
 
 - **✨ SpockAI Implementation Complete** - Full implementation of SpockAI personal assistant bot with 102 tasks, 68 TypeScript files, 7 skills (email, calendar, beans, notify, services, chat, config), and 13 passing integration tests

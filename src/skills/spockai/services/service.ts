@@ -9,8 +9,7 @@ import type {
   ServicesConfig,
   ServiceSyncResult,
   ServiceFilterOptions,
-  ServiceStatus,
-  ServiceProvider
+  ServiceStatus
 } from './types.js';
 import { SamanageClient, createSamanageClient } from './samanage-client.js';
 import { MondayClient, createMondayClient } from './monday-client.js';

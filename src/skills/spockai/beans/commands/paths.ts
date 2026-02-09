@@ -138,7 +138,7 @@ function removePath(service: BeansService, path: string): CommandResult<PathsRes
     // Try to find by index
     const index = parseInt(path, 10) - 1;
     if (!isNaN(index) && index >= 0 && index < paths.length) {
-      targetPath = paths[index];
+      targetPath = paths[index] ?? path;
     } else {
       // Try partial match
       const match = paths.find(p =>

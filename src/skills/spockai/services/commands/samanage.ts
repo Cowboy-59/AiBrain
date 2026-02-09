@@ -18,9 +18,10 @@ function getServicesService(config: ServicesConfig): ExternalServicesService {
 }
 
 interface SamanageResult {
-  requests: ServiceRequest[];
-  count: number;
+  requests?: ServiceRequest[];
+  count?: number;
   filter?: string;
+  connected?: boolean;
 }
 
 /**
@@ -110,7 +111,7 @@ export async function samanageCommand(
  */
 async function connectCommand(
   context: CommandContext
-): Promise<CommandResult<{ connected: boolean }>> {
+): Promise<CommandResult<SamanageResult>> {
   const config = context.config.services as ServicesConfig;
 
   if (!config.samanage) {

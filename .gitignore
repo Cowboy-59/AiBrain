@@ -3,6 +3,7 @@
 *.key
 *.pem
 .auth_token
+**/start-*.bat
 
 # OS files
 .DS_Store
@@ -15,6 +16,11 @@ Thumbs.db
 /*.o
 /*.pyc
 /*.class
+
+# Electron build output and dependencies
+src/skills/spockai/tray/dist/
+src/skills/spockai/tray/node_modules/
+src/skills/spockai/mobile/node_modules/
 
 # Dependency directories
 /node_modules/
@@ -31,3 +37,4 @@ vite.config.ts.*
 *.tar.gz
 .vscode
 .claude/master.txt
+nul

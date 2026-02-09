@@ -10,7 +10,7 @@ export interface TeamsConfig {
   botAppSecret?: string;        // Bot app secret
   channelId?: string;           // Target channel ID
   tenantId?: string;            // Azure AD tenant ID
-  enabled: boolean;
+  enabled?: boolean;
 }
 
 // Teams webhook payload

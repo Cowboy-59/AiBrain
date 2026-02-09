@@ -5,7 +5,7 @@
  * Run with: npx tsx src/skills/spockai/tests/integration.test.ts
  *
  * Prerequisites:
- * - Configure ~/.openclaw/skills/spockai/config.yaml with credentials
+ * - Configure ~/.spockai/config.json with credentials
  * - Set environment variables for sensitive values
  */
 
@@ -110,13 +110,18 @@ async function testEmailClassifier(): Promise<void> {
   const mockEmail = {
     id: 'test-1',
     accountId: 'test-account',
+    messageId: 'msg-test-1',
     sender: 'Sender Name',
     senderEmail: 'sender@example.com',
+    recipients: ['recipient@example.com'],
     subject: 'URGENT: Please review this ASAP',
     snippet: 'This is urgent...',
     receivedAt: new Date(),
+    priority: 'low' as const,
     isRead: false,
-    labels: []
+    isStarred: false,
+    labels: [],
+    hasAttachments: false
   };
 
   const priority = classifier.classify(mockEmail);
@@ -202,7 +207,7 @@ async function testNotificationQueue(): Promise<void> {
 
   // Test enqueue returns an ID
   const notificationId = queue.enqueue({
-    type: 'email',
+    type: 'high_priority_email',
     title: 'Test',
     message: 'Test notification',
     priority: 'high',
@@ -233,18 +238,13 @@ async function testTeamsCards(): Promise<void> {
 
   const builder = new TeamsAdaptiveCardBuilder();
 
-  // Test with proper email structure
-  const card = builder.buildEmailCard({
-    id: 'email-1',
-    accountId: 'acc-1',
-    sender: 'Sender Name',
-    senderEmail: 'sender@test.com',
-    subject: 'Important Email',
-    snippet: 'This is the email snippet.',
-    receivedAt: new Date(),
-    isRead: false,
-    labels: []
-  }, 'high');
+  // Test with proper email card parameters
+  const card = builder.buildEmailCard(
+    'sender@test.com',
+    'Important Email',
+    'This is the email snippet.',
+    'high'
+  );
 
   if (!card.body || card.body.length === 0) {
     throw new Error('Card body is empty');
@@ -301,7 +301,8 @@ async function testHealthCheck(): Promise<void> {
   health.registerCheck('test-check', async () => ({
     name: 'test-check',
     status: 'pass',
-    message: 'All good'
+    message: 'All good',
+    lastCheck: new Date()
   }));
 
   await health.runAllChecks();

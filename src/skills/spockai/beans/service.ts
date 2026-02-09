@@ -218,7 +218,7 @@ export class BeansService {
   } {
     const priorityOne = this.getPriorityOneItems();
     const lastScan = this.lastScanResults.length > 0
-      ? this.lastScanResults[0].scannedAt
+      ? this.lastScanResults[0]?.scannedAt
       : undefined;
 
     return {

@@ -106,7 +106,7 @@ export class ConversationEngine {
   /**
    * Process a detected intent
    */
-  private async processIntent(intent: ConfigurationIntent, input: string): Promise<string> {
+  private async processIntent(intent: ConfigurationIntent, _input: string): Promise<string> {
     chatLogger.debug('Processing intent', {
       type: intent.type,
       confidence: intent.confidence

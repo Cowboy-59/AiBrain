@@ -23,11 +23,9 @@ export interface GmailAuthConfig {
  * Gmail OAuth Handler
  */
 export class GmailAuthHandler {
-  private oauth2Client: ReturnType<typeof google.auth.OAuth2.prototype.constructor>;
-  private config: GmailAuthConfig;
+  private oauth2Client: InstanceType<typeof google.auth.OAuth2>;
 
   constructor(config: GmailAuthConfig) {
-    this.config = config;
     this.oauth2Client = new google.auth.OAuth2(
       config.clientId,
       config.clientSecret,
@@ -61,7 +59,7 @@ export class GmailAuthHandler {
 
       return {
         accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
+        refreshToken: tokens.refresh_token ?? undefined,
         expiresIn: tokens.expiry_date
           ? Math.floor((tokens.expiry_date - Date.now()) / 1000)
           : 3600,

@@ -3,7 +3,7 @@
  * Scans directories for .beans/ folders and extracts priority items
  */
 
-import { readdir, stat } from 'fs/promises';
+import { readdir } from 'fs/promises';
 import { join, resolve } from 'path';
 import { existsSync } from 'fs';
 import type {
@@ -308,7 +308,7 @@ export class BeansScanner {
   /**
    * Find all markdown files in a .beans directory
    */
-  private async findBeansFiles(beansDir: string): Promise<string[]> {
+  async findBeansFiles(beansDir: string): Promise<string[]> {
     const files: string[] = [];
 
     try {

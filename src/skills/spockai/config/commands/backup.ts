@@ -30,7 +30,7 @@ interface ListResult {
   backups: BackupInfo[];
 }
 
-const BACKUP_DIR = join(homedir(), '.openclaw', 'backups');
+const BACKUP_DIR = join(homedir(), '.spockai', 'backups');
 
 /**
  * Config backup command handler
@@ -93,7 +93,7 @@ _Use \`/config restore ${backupName}\` to restore this backup_`
  */
 export async function restoreCommand(
   args: string[],
-  context: CommandContext
+  _context: CommandContext
 ): Promise<CommandResult<RestoreResult>> {
   try {
     const backupName = args[0];
@@ -140,7 +140,7 @@ export async function restoreCommand(
 
     // Read and parse backup
     const content = await readFile(backupPath, 'utf-8');
-    const restoredConfig = JSON.parse(content);
+    JSON.parse(content);  // Validate JSON format
 
     // In production, this would update the actual config file
     // For now, just validate and report

@@ -4,7 +4,7 @@
  */
 
 import type { ConfigurationIntent, IntentType, IntentEntities } from './types.js';
-import { chatLogger } from '../utils/logger.js';
+// Unused: chatLogger import removed
 
 // Intent patterns with keywords and confidence weights
 interface IntentPattern {
@@ -166,7 +166,7 @@ export class IntentParser {
   /**
    * Extract entities from input
    */
-  private extractEntities(input: string, intentType: IntentType): IntentEntities {
+  private extractEntities(input: string, _intentType: IntentType): IntentEntities {
     const entities: IntentEntities = {};
 
     // Extract provider

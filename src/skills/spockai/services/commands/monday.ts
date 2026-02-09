@@ -18,9 +18,10 @@ function getServicesService(config: ServicesConfig): ExternalServicesService {
 }
 
 interface MondayResult {
-  requests: ServiceRequest[];
-  count: number;
+  requests?: ServiceRequest[];
+  count?: number;
   boardFilter?: string;
+  connected?: boolean;
 }
 
 /**
@@ -130,7 +131,7 @@ export async function mondayCommand(
  */
 async function connectCommand(
   context: CommandContext
-): Promise<CommandResult<{ connected: boolean }>> {
+): Promise<CommandResult<MondayResult>> {
   const config = context.config.services as ServicesConfig;
 
   if (!config.monday) {

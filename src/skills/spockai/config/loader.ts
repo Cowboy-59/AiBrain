@@ -11,7 +11,7 @@ import type { SpockAIConfig, OpenClawConfig } from '../types/config.js';
 import type { ValidationResult } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 
-const DEFAULT_CONFIG_PATH = join(homedir(), '.openclaw', 'openclaw.json');
+const DEFAULT_CONFIG_PATH = join(homedir(), '.spockai', 'config.json');
 
 // Default configuration values
 const DEFAULT_SPOCKAI_CONFIG: SpockAIConfig = {
@@ -41,7 +41,8 @@ const DEFAULT_SPOCKAI_CONFIG: SpockAIConfig = {
   },
   services: {
     samanage: { enabled: false, baseUrl: '', apiKey: '' },
-    monday: { enabled: false, apiToken: '' }
+    monday: { enabled: false, apiToken: '' },
+    syncInterval: 15
   }
 };
 

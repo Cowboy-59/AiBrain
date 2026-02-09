@@ -1,0 +1,53 @@
+{
+  "name": "spockai-tray",
+  "version": "1.0.0",
+  "description": "SpockAI - AI-Powered Personal Assistant",
+  "main": "main.js",
+  "author": "SpockAI",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "build:portable": "electron-builder --win portable",
+    "build:installer": "electron-builder --win nsis"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.73.0",
+    "grammy": "^1.21.1"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.spockai.assistant",
+    "productName": "SpockAI",
+    "copyright": "Copyright © 2026 SpockAI",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "SpockAI-${version}-portable.${ext}",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "SpockAI-${version}-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "SpockAI-${version}-portable.${ext}"
+    }
+  }
+}

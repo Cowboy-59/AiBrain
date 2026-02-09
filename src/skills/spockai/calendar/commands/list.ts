@@ -5,7 +5,7 @@
 
 import type { CommandResult } from '../../types/index.js';
 import type { CommandContext } from '../../base/skill.js';
-import type { Appointment, TimeWindow, CalendarConfig } from '../types.js';
+import type { Appointment, TimeWindow } from '../types.js';
 import { CalendarService, createCalendarService } from '../service.js';
 
 let calendarService: CalendarService | null = null;

@@ -7,7 +7,6 @@ import type {
   NotificationChannel,
   EmailProvider,
   CalendarProvider,
-  ServiceType,
   Priority,
   NotificationEventType
 } from './index.js';
@@ -25,6 +24,7 @@ export interface TeamsConfig {
   tenantId?: string;
   botAppId?: string;
   botAppSecret?: string;
+  enabled?: boolean;
 }
 
 // Notification rule
@@ -143,8 +143,9 @@ export interface MondayConfig {
 
 // External services configuration
 export interface ServicesConfig {
-  samanage: SamanageConfig;
-  monday: MondayConfig;
+  samanage?: SamanageConfig;
+  monday?: MondayConfig;
+  syncInterval: number;  // Minutes between syncs
 }
 
 // Root SpockAI configuration

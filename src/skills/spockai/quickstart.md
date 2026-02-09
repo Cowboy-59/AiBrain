@@ -22,7 +22,7 @@ npm run build
 3. Copy your bot token
 4. Get your chat ID by messaging [@userinfobot](https://t.me/userinfobot)
 
-Create `~/.openclaw/skills/spockai/config.yaml`:
+Create `~/.spockai/skills/spockai/config.yaml`:
 
 ```yaml
 notifications:

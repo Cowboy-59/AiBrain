@@ -16,7 +16,7 @@ const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 const SALT_LENGTH = 32;
 
-const KEY_FILE_PATH = join(homedir(), '.openclaw', '.spockai-key');
+const KEY_FILE_PATH = join(homedir(), '.spockai', '.encryption-key');
 
 /**
  * Get or create encryption key

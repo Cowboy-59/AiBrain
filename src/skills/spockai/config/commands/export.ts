@@ -32,8 +32,9 @@ export async function exportCommand(
 
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];
-      if (arg === '--format' && args[i + 1]) {
-        format = args[i + 1].toLowerCase() as ExportFormat;
+      const nextArg = args[i + 1];
+      if (arg === '--format' && nextArg) {
+        format = nextArg.toLowerCase() as ExportFormat;
         i++;
       } else if (arg === '--include-secrets') {
         includeSecrets = true;
@@ -48,16 +49,17 @@ export async function exportCommand(
     }
 
     // Prepare config
+    const configToExport = context.config as unknown as Record<string, unknown>;
     const config = includeSecrets
-      ? context.config
-      : sanitizeConfig(context.config);
+      ? configToExport
+      : sanitizeConfig(configToExport);
 
     // Generate filename
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const filename = `spockai-config-${timestamp}.${format}`;
 
     // Export directory
-    const exportDir = join(homedir(), '.openclaw', 'exports');
+    const exportDir = join(homedir(), '.spockai', 'exports');
     await mkdir(exportDir, { recursive: true });
 
     const exportPath = join(exportDir, filename);

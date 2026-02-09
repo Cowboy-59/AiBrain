@@ -26,7 +26,7 @@ interface ListResult {
  * Services list command handler
  */
 export async function listCommand(
-  args: string[],
+  _args: string[],
   context: CommandContext
 ): Promise<CommandResult<ListResult>> {
   const config = context.config.services as ServicesConfig;

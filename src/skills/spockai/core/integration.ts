@@ -20,13 +20,15 @@ interface IntegrationConfig {
   calendarReminderLead: number;   // Minutes before event to send reminder
   beansPollingInterval: number;   // Minutes between BEANS scans
   servicesPollingInterval: number; // Minutes between external service syncs
+  vipSenders: string[];           // VIP sender email addresses
 }
 
 const DEFAULT_CONFIG: IntegrationConfig = {
   emailPollingInterval: 5,
   calendarReminderLead: 15,
   beansPollingInterval: 30,
-  servicesPollingInterval: 15
+  servicesPollingInterval: 15,
+  vipSenders: []
 };
 
 /**
@@ -343,17 +345,31 @@ export class IntegrationManager {
   private async notifyHighPriorityEmail(email: Email): Promise<void> {
     if (!this.notificationService) return;
 
+    // Check if sender is VIP
+    const isVip = this.isVipSender(email.senderEmail);
+    const vipLabel = isVip ? '⭐ VIP ' : '';
+
     const payload: NotificationPayload = {
       type: 'high_priority_email',
-      title: `📧 High-Priority Email`,
-      message: `**From**: ${email.senderName || email.senderEmail}\n**Subject**: ${email.subject}`,
+      title: `📧 ${vipLabel}High-Priority Email`,
+      message: `**From**: ${vipLabel}${email.senderName || email.senderEmail}\n**Subject**: ${email.subject}`,
       priority: 'high',
       sourceId: email.id,
       timestamp: email.receivedAt
     };
 
     await this.notificationService.notify(payload);
-    coreLogger.info('High-priority email notification sent', { emailId: email.id });
+    coreLogger.info('High-priority email notification sent', { emailId: email.id, isVip });
+  }
+
+  /**
+   * Check if sender is a VIP
+   */
+  private isVipSender(senderEmail: string): boolean {
+    const normalizedSender = senderEmail.toLowerCase();
+    return this.config.vipSenders.some(
+      vip => normalizedSender.includes(vip.toLowerCase())
+    );
   }
 
   private async notifyCalendarReminder(event: Appointment): Promise<void> {

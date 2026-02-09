@@ -48,7 +48,7 @@
 
 ## Configuration
 
-Email configuration is stored in `~/.openclaw/openclaw.json`:
+Email configuration is stored in `~/.spockai/config.json`:
 
 ```json
 {

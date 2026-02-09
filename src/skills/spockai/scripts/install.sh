@@ -39,7 +39,7 @@ find_node() {
 # Find SpockAI
 find_spockai() {
     local paths=(
-        "$HOME/.openclaw/workspace/skills/spockai"
+        "$HOME/.spockai/skills/spockai"
         "$(dirname "$0")/.."
     )
 
@@ -130,7 +130,7 @@ install_macos() {
     mkdir -p "$HOME/Library/LaunchAgents"
 
     local plist_path="$HOME/Library/LaunchAgents/com.spockai.agent.plist"
-    local log_path="$HOME/.openclaw/logs"
+    local log_path="$HOME/.spockai/logs"
     mkdir -p "$log_path"
 
     # Create plist file

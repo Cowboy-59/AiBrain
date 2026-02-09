@@ -6,7 +6,7 @@
 import type { CommandResult } from '../../types/index.js';
 import type { CommandContext } from '../../base/skill.js';
 import type { TeamsConfig } from '../teams-types.js';
-import { TeamsNotifier, createTeamsNotifier } from '../teams.js';
+import { createTeamsNotifier } from '../teams.js';
 
 /**
  * Teams setup command handler

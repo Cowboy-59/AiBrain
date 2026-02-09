@@ -2,6 +2,7 @@ const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification } = r
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
+const crypto = require('crypto');
 const Anthropic = require('@anthropic-ai/sdk');
 
 // Configuration - to be replaced with new config system
@@ -29,6 +30,8 @@ const KNOWLEDGE_DIR = path.join(SPOCKAI_DIR, 'knowledge');
 const SCRATCH_FILE = path.join(DATA_DIR, 'scratch.json');
 const TRIAGE_FILE = path.join(DATA_DIR, 'triage-rules.json');
 const DEFERRED_FILE = path.join(DATA_DIR, 'deferred.json');
+const VAULT_FILE = path.join(SPOCKAI_DIR, 'vault.enc');
+const VAULT_KEY_FILE = path.join(SPOCKAI_DIR, '.vault-key');
 
 // Scheduled check-in timers
 let checkInTimers = {};
@@ -53,11 +56,332 @@ function loadConfig() {
   return config;
 }
 
+// Overlay vault keys into config so the rest of the app works seamlessly
+function overlayVaultKeys() {
+  const vault = loadVault();
+  if (!vault || Object.keys(vault.keys).length === 0) return;
+
+  // Telegram keys
+  if (vault.keys['telegram']) {
+    if (!config.notifications) config.notifications = {};
+    if (!config.notifications.telegram) config.notifications.telegram = {};
+    const tg = vault.keys['telegram'].keys;
+    if (tg.botToken) config.notifications.telegram.botToken = tg.botToken;
+    if (tg.chatId) config.notifications.telegram.chatId = tg.chatId;
+  }
+
+  // Google OAuth - overlay into email accounts and calendar sources
+  if (vault.keys['google-oauth']) {
+    const creds = vault.keys['google-oauth'].keys;
+    if (config.email?.accounts) {
+      for (const account of config.email.accounts) {
+        if (!account.credentials) account.credentials = {};
+        if (creds.clientId) account.credentials.clientId = creds.clientId;
+        if (creds.clientSecret) account.credentials.clientSecret = creds.clientSecret;
+        if (creds.refreshToken) account.credentials.refreshToken = creds.refreshToken;
+      }
+    }
+    if (config.calendar?.sources) {
+      for (const source of config.calendar.sources) {
+        if (!source.credentials) source.credentials = {};
+        if (creds.clientId) source.credentials.clientId = creds.clientId;
+        if (creds.clientSecret) source.credentials.clientSecret = creds.clientSecret;
+        if (creds.refreshToken) source.credentials.refreshToken = creds.refreshToken;
+      }
+    }
+  }
+
+  // Teams
+  if (vault.keys['teams']) {
+    if (!config.teams) config.teams = {};
+    const t = vault.keys['teams'].keys;
+    if (t.tenantId) config.teams.tenantId = t.tenantId;
+    if (t.clientId) config.teams.clientId = t.clientId;
+    if (t.clientSecret) config.teams.clientSecret = t.clientSecret;
+    if (t.webhookUrl) config.teams.webhookUrl = t.webhookUrl;
+  }
+
+  // Zoom
+  if (vault.keys['zoom']) {
+    if (!config.zoom) config.zoom = {};
+    const z = vault.keys['zoom'].keys;
+    if (z.accountId) config.zoom.accountId = z.accountId;
+    if (z.clientId) config.zoom.clientId = z.clientId;
+    if (z.clientSecret) config.zoom.clientSecret = z.clientSecret;
+  }
+
+  console.log('Vault keys overlaid into config');
+}
+
+// ============================================
+// ENCRYPTED KEY VAULT
+// ============================================
+
+function ensureVaultKey() {
+  try {
+    if (fs.existsSync(VAULT_KEY_FILE)) {
+      return fs.readFileSync(VAULT_KEY_FILE);
+    }
+    const key = crypto.randomBytes(32);
+    fs.mkdirSync(path.dirname(VAULT_KEY_FILE), { recursive: true });
+    fs.writeFileSync(VAULT_KEY_FILE, key, { mode: 0o600 });
+    console.log('Vault encryption key generated');
+    return key;
+  } catch (error) {
+    console.error('Failed to ensure vault key:', error);
+    return null;
+  }
+}
+
+function loadVault() {
+  try {
+    if (!fs.existsSync(VAULT_FILE)) {
+      return { version: 1, created: new Date().toISOString(), updated: new Date().toISOString(), keys: {} };
+    }
+    const vaultKey = ensureVaultKey();
+    if (!vaultKey) return null;
+
+    const encrypted = fs.readFileSync(VAULT_FILE, 'utf-8');
+    const parts = encrypted.split(':');
+    if (parts.length !== 3) return null;
+
+    const iv = Buffer.from(parts[0], 'hex');
+    const authTag = Buffer.from(parts[1], 'hex');
+    const ciphertext = Buffer.from(parts[2], 'hex');
+
+    const decipher = crypto.createDecipheriv('aes-256-gcm', vaultKey, iv);
+    decipher.setAuthTag(authTag);
+    let decrypted = decipher.update(ciphertext, null, 'utf-8');
+    decrypted += decipher.final('utf-8');
+
+    return JSON.parse(decrypted);
+  } catch (error) {
+    console.error('Failed to load vault:', error);
+    return null;
+  }
+}
+
+function saveVault(data) {
+  try {
+    const vaultKey = ensureVaultKey();
+    if (!vaultKey) return false;
+
+    data.updated = new Date().toISOString();
+    const plaintext = JSON.stringify(data, null, 2);
+
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv('aes-256-gcm', vaultKey, iv);
+    let encrypted = cipher.update(plaintext, 'utf-8', 'hex');
+    encrypted += cipher.final('hex');
+    const authTag = cipher.getAuthTag().toString('hex');
+
+    fs.writeFileSync(VAULT_FILE, `${iv.toString('hex')}:${authTag}:${encrypted}`);
+    return true;
+  } catch (error) {
+    console.error('Failed to save vault:', error);
+    return false;
+  }
+}
+
+function getVaultKey(service, keyName) {
+  const vault = loadVault();
+  if (!vault || !vault.keys[service]) return null;
+  return vault.keys[service].keys[keyName] || null;
+}
+
+function setVaultKeys(service, label, source, keys) {
+  const vault = loadVault();
+  if (!vault) return false;
+
+  vault.keys[service] = { source, label, keys };
+  return saveVault(vault);
+}
+
+function removeVaultService(service) {
+  const vault = loadVault();
+  if (!vault || !vault.keys[service]) return false;
+
+  delete vault.keys[service];
+  return saveVault(vault);
+}
+
+function listVaultKeys() {
+  const vault = loadVault();
+  if (!vault) return { error: 'Vault not available' };
+
+  const grouped = {};
+  for (const [service, entry] of Object.entries(vault.keys)) {
+    const src = entry.source || 'Unknown';
+    if (!grouped[src]) grouped[src] = [];
+    grouped[src].push({
+      service,
+      label: entry.label,
+      keyNames: Object.keys(entry.keys),
+      keyCount: Object.keys(entry.keys).length
+    });
+  }
+  return { sources: grouped, totalServices: Object.keys(vault.keys).length };
+}
+
+function exportVaultKeys(service) {
+  const vault = loadVault();
+  if (!vault || !vault.keys[service]) {
+    return { error: `Service '${service}' not found in vault` };
+  }
+
+  const entry = vault.keys[service];
+  const masked = {};
+  for (const [k, v] of Object.entries(entry.keys)) {
+    if (typeof v === 'string' && v.length > 8) {
+      masked[k] = v.substring(0, 4) + '...' + v.substring(v.length - 4);
+    } else {
+      masked[k] = v;
+    }
+  }
+  return {
+    service,
+    source: entry.source,
+    label: entry.label,
+    keys: entry.keys,
+    masked
+  };
+}
+
+function migrateConfigToVault() {
+  const vault = loadVault();
+  if (!vault) return { error: 'Vault not available' };
+
+  let migrated = 0;
+
+  // Anthropic API key from environment
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (anthropicKey && !vault.keys['anthropic']) {
+    vault.keys['anthropic'] = {
+      source: 'Anthropic',
+      label: 'Claude API Key',
+      keys: { apiKey: anthropicKey }
+    };
+    migrated++;
+  }
+
+  // Google OAuth from email accounts
+  if (config?.email?.accounts?.[0]?.credentials && !vault.keys['google-oauth']) {
+    const creds = config.email.accounts[0].credentials;
+    if (creds.clientId || creds.clientSecret || creds.refreshToken) {
+      vault.keys['google-oauth'] = {
+        source: 'Google Cloud',
+        label: 'Google OAuth (Gmail + Calendar)',
+        keys: {
+          clientId: creds.clientId || '',
+          clientSecret: creds.clientSecret || '',
+          refreshToken: creds.refreshToken || ''
+        }
+      };
+      migrated++;
+    }
+  }
+
+  // Telegram
+  if (config?.notifications?.telegram && !vault.keys['telegram']) {
+    const tg = config.notifications.telegram;
+    if (tg.botToken || tg.chatId) {
+      vault.keys['telegram'] = {
+        source: 'Telegram',
+        label: 'SpockAI Bot',
+        keys: {
+          botToken: tg.botToken || '',
+          chatId: tg.chatId || ''
+        }
+      };
+      migrated++;
+    }
+  }
+
+  // Teams
+  if (config?.teams && !vault.keys['teams']) {
+    const t = config.teams;
+    if (t.tenantId || t.clientId || t.clientSecret || t.webhookUrl) {
+      vault.keys['teams'] = {
+        source: 'Microsoft',
+        label: 'Teams Integration',
+        keys: {
+          tenantId: t.tenantId || '',
+          clientId: t.clientId || '',
+          clientSecret: t.clientSecret || '',
+          webhookUrl: t.webhookUrl || ''
+        }
+      };
+      migrated++;
+    }
+  }
+
+  // Zoom
+  if (config?.zoom && !vault.keys['zoom']) {
+    const z = config.zoom;
+    if (z.accountId || z.clientId || z.clientSecret) {
+      vault.keys['zoom'] = {
+        source: 'Zoom',
+        label: 'Zoom Meetings',
+        keys: {
+          accountId: z.accountId || '',
+          clientId: z.clientId || '',
+          clientSecret: z.clientSecret || ''
+        }
+      };
+      migrated++;
+    }
+  }
+
+  // Samanage
+  if (config?.services?.samanage && !vault.keys['samanage']) {
+    const s = config.services.samanage;
+    if (s.apiKey) {
+      vault.keys['samanage'] = {
+        source: 'Samanage',
+        label: 'Service Desk',
+        keys: { apiKey: s.apiKey }
+      };
+      migrated++;
+    }
+  }
+
+  // Monday.com
+  if (config?.services?.monday && !vault.keys['monday']) {
+    const m = config.services.monday;
+    if (m.apiToken) {
+      vault.keys['monday'] = {
+        source: 'Monday.com',
+        label: 'Project Management',
+        keys: { apiToken: m.apiToken }
+      };
+      migrated++;
+    }
+  }
+
+  // OpenAI (from environment)
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (openaiKey && !vault.keys['openai']) {
+    vault.keys['openai'] = {
+      source: 'OpenAI',
+      label: 'Whisper Transcription',
+      keys: { apiKey: openaiKey }
+    };
+    migrated++;
+  }
+
+  if (migrated > 0) {
+    saveVault(vault);
+    console.log(`Migrated ${migrated} services to encrypted vault`);
+  }
+
+  return { migrated, totalServices: Object.keys(vault.keys).length };
+}
+
 // Initialize Claude AI
 function initializeAI() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = getVaultKey('anthropic', 'apiKey') || process.env.ANTHROPIC_API_KEY || config?.ai?.apiKey;
   if (!apiKey) {
-    console.log('ANTHROPIC_API_KEY not set, AI features disabled');
+    console.log('No Anthropic API key found (vault, env, config), AI features disabled');
     return false;
   }
 
@@ -2774,6 +3098,85 @@ const tools = [
       },
       required: []
     }
+  },
+  // ============================================
+  // SECURITY VAULT TOOLS
+  // ============================================
+  {
+    name: 'vault_list',
+    description: 'List all stored API keys and credentials in the encrypted vault, grouped by source (Google Cloud, Telegram, Anthropic, etc.). Shows service names and key names but NOT key values.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'vault_store',
+    description: 'Store an API key or credential in the encrypted vault. Keys are encrypted with AES-256-GCM.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        service: {
+          type: 'string',
+          description: 'Service identifier (e.g., "anthropic", "google-oauth", "telegram", "openai")'
+        },
+        label: {
+          type: 'string',
+          description: 'Human-readable label (e.g., "Claude API Key", "SpockAI Bot")'
+        },
+        source: {
+          type: 'string',
+          description: 'Where the key came from (e.g., "Anthropic", "Google Cloud", "Telegram")'
+        },
+        key_name: {
+          type: 'string',
+          description: 'Name of the specific key (e.g., "apiKey", "clientSecret", "botToken")'
+        },
+        key_value: {
+          type: 'string',
+          description: 'The actual key/credential value to store'
+        }
+      },
+      required: ['service', 'label', 'source', 'key_name', 'key_value']
+    }
+  },
+  {
+    name: 'vault_get',
+    description: 'Retrieve and display a specific key from the vault for recovery purposes. Shows both masked and full values.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        service: {
+          type: 'string',
+          description: 'Service identifier (e.g., "anthropic", "google-oauth")'
+        }
+      },
+      required: ['service']
+    }
+  },
+  {
+    name: 'vault_remove',
+    description: 'Remove a service and all its keys from the encrypted vault.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        service: {
+          type: 'string',
+          description: 'Service identifier to remove'
+        }
+      },
+      required: ['service']
+    }
+  },
+  {
+    name: 'vault_migrate',
+    description: 'Migrate existing plaintext keys from config.json and environment variables into the encrypted vault. Safe to run multiple times - skips services already in vault.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
   }
 ];
 
@@ -2909,6 +3312,33 @@ async function executeTool(toolName, toolInput) {
       return getContextStatus();
     case 'flush_context':
       return flushContext(toolInput.preserve_important !== false);
+    // Security Vault
+    case 'vault_list':
+      return listVaultKeys();
+    case 'vault_store': {
+      const vault = loadVault();
+      if (!vault) return { error: 'Vault not available' };
+      if (!vault.keys[toolInput.service]) {
+        vault.keys[toolInput.service] = { source: toolInput.source, label: toolInput.label, keys: {} };
+      }
+      vault.keys[toolInput.service].source = toolInput.source;
+      vault.keys[toolInput.service].label = toolInput.label;
+      vault.keys[toolInput.service].keys[toolInput.key_name] = toolInput.key_value;
+      const saved = saveVault(vault);
+      return saved
+        ? { success: true, message: `Stored ${toolInput.key_name} for ${toolInput.service} (${toolInput.source})` }
+        : { error: 'Failed to save vault' };
+    }
+    case 'vault_get':
+      return exportVaultKeys(toolInput.service);
+    case 'vault_remove': {
+      const removed = removeVaultService(toolInput.service);
+      return removed
+        ? { success: true, message: `Removed ${toolInput.service} from vault` }
+        : { error: `Service '${toolInput.service}' not found in vault` };
+    }
+    case 'vault_migrate':
+      return migrateConfigToVault();
     default:
       return { error: `Unknown tool: ${toolName}` };
   }
@@ -3225,15 +3655,7 @@ async function handleVoiceMessage(fileId, botToken, chatId, from) {
     if (anthropic && transcription && !transcription.startsWith('[')) {
       await processAndRespondTelegram(`[Voice message transcription]: ${transcription}`, botToken, chatId);
     } else {
-      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: `🎤 Transcription: ${transcription}`,
-          parse_mode: 'Markdown'
-        })
-      });
+      await sendTelegramMsg(botToken, chatId, `🎤 Transcription: ${transcription}`);
     }
   } catch (error) {
     console.error('Voice message handling error:', error);
@@ -3314,16 +3736,8 @@ async function handlePhotoMessage(fileId, caption, botToken, chatId, from) {
     const textBlock = response.content.find(b => b.type === 'text');
     const analysis = textBlock?.text || 'Could not analyze image.';
 
-    // Send analysis back to Telegram
-    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: `📷 *Image Analysis*\n\n${analysis}`,
-        parse_mode: 'Markdown'
-      })
-    });
+    // Send analysis back to Telegram (with markdown fallback)
+    await sendTelegramMsg(botToken, chatId, `📷 *Image Analysis*\n\n${analysis}`);
 
     // Show in chat window
     if (chatWindow && !chatWindow.isDestroyed()) {
@@ -3338,6 +3752,30 @@ async function handlePhotoMessage(fileId, caption, botToken, chatId, from) {
   }
 }
 
+// Send a Telegram message with Markdown, falling back to plain text on parse errors
+async function sendTelegramMsg(botToken, chatId, text) {
+  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+  const headers = { 'Content-Type': 'application/json' };
+
+  // Try with Markdown first
+  let response = await fetch(url, {
+    method: 'POST', headers,
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'Markdown' })
+  });
+  let result = await response.json();
+
+  // Fall back to plain text if Markdown parsing fails
+  if (!result.ok && result.description && result.description.includes("can't parse entities")) {
+    response = await fetch(url, {
+      method: 'POST', headers,
+      body: JSON.stringify({ chat_id: chatId, text })
+    });
+    result = await response.json();
+  }
+
+  return result;
+}
+
 async function sendToTelegram(message) {
   if (!config?.notifications?.telegram) {
     return { success: false, error: 'Telegram not configured' };
@@ -3345,18 +3783,7 @@ async function sendToTelegram(message) {
 
   try {
     const { botToken, chatId } = config.notifications.telegram;
-
-    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: 'Markdown'
-      })
-    });
-
-    const result = await response.json();
+    const result = await sendTelegramMsg(botToken, chatId, message);
 
     if (result.ok) {
       return { success: true, message: 'Sent to Telegram', messageId: result.result.message_id };
@@ -3462,16 +3889,8 @@ async function processAndRespondTelegram(userMessage, botToken, chatId) {
     const result = await chatWithAI(userMessage, true);
 
     if (result.success && result.message) {
-      // Send response back to Telegram
-      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: result.message,
-          parse_mode: 'Markdown'
-        })
-      });
+      // Send response back to Telegram (with markdown fallback)
+      await sendTelegramMsg(botToken, chatId, result.message);
 
       // Also show in chat window
       if (chatWindow && !chatWindow.isDestroyed()) {
@@ -3799,11 +4218,17 @@ function initializeDeferred() {
 // App lifecycle
 app.whenReady().then(() => {
   loadConfig();
+
+  // Initialize encrypted vault and migrate existing keys
+  ensureVaultKey();
+  migrateConfigToVault();
+  overlayVaultKeys();
+
   loadReminders(); // Load and schedule saved reminders
   createTray();
   createChatWindow();
 
-  // Initialize AI
+  // Initialize AI (checks vault -> env -> config for API key)
   const aiReady = initializeAI();
 
   // Start session

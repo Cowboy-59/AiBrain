@@ -12,6 +12,7 @@ All notable changes to the Claude Project Starter Kit will be documented here.
 ---
 
 ### February 8, 2026
+- **✨ Encrypted Key Vault** - AES-256-GCM encrypted credential storage (~/.spockai/vault.enc), auto-migration from config.json, 5 Claude AI vault tools, Telegram send markdown fallback
 - **✨ SpockAI Phases 1-4** - Memory system, scheduled check-ins, email triage, Second Brain, session logging, voice/image, scratch pad, defer, web interface, context monitoring, subagents, mobile app
 
 - **✨ SpockAI Phases 1-4** - Memory system (daily logs, MEMORY.md, USER.md), scheduled check-ins (7am/12pm/5pm/8pm), email triage rules, Second Brain knowledge base, session logging, voice transcription, image analysis, scratch pad, defer system, web interface (port 3000), context monitoring, subagent orchestration

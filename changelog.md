@@ -11,6 +11,14 @@ All notable changes to the Claude Project Starter Kit will be documented here.
 
 ---
 
+### February 9, 2026
+
+- **✨ Full Email Control** - Gmail: read full body, reply in thread, forward, modify (read/unread/star/archive/trash), search with Gmail syntax, label management, OAuth re-auth flow. Outlook: query, read, send, reply, modify via Microsoft Graph API
+- **✨ Full Calendar Control** - Google Calendar: update, delete, RSVP (accept/decline/tentative), search across calendars, recurring events (RRULE), list calendars, attendee support. Outlook Calendar: query, create, update, delete via Graph API
+- **✨ Beads Enhancement** - Batch create multiple beads, AI auto-create P1/P2 beads from conversation context with trigger reasons logged to daily log
+- **✨ Instance Management** - Single-instance lock using Electron requestSingleInstanceLock, dialog for open existing/start new/cancel, second-instance event handler
+- **🔧 Legacy Cleanup** - Remove AGENTS.md, sync-global command; async Stop hook in global settings
+
 ### February 8, 2026
 - **✨ Encrypted Key Vault** - AES-256-GCM encrypted credential storage (~/.spockai/vault.enc), auto-migration from config.json, 5 Claude AI vault tools, Telegram send markdown fallback
 - **✨ SpockAI Phases 1-4** - Memory system, scheduled check-ins, email triage, Second Brain, session logging, voice/image, scratch pad, defer, web interface, context monitoring, subagents, mobile app

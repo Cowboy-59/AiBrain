@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -420,6 +420,130 @@ async function getGoogleAccessToken(credentials) {
   }
 }
 
+// Re-authorize Google OAuth with expanded scopes
+async function reauthorizeGoogle() {
+  const account = config?.email?.accounts?.find(a => a.enabled && a.credentials?.clientId);
+  const calSource = config?.calendar?.sources?.find(s => s.enabled && s.credentials?.clientId);
+  const creds = account?.credentials || calSource?.credentials;
+
+  if (!creds?.clientId || !creds?.clientSecret) {
+    return { error: 'No Google OAuth credentials found in config. Need clientId and clientSecret.' };
+  }
+
+  const SCOPES = [
+    'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/gmail.labels',
+    'https://www.googleapis.com/auth/calendar'
+  ].join(' ');
+
+  const REDIRECT_PORT = 39847;
+  const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}/callback`;
+
+  return new Promise((resolve) => {
+    const server = http.createServer(async (req, res) => {
+      const url = new URL(req.url, `http://localhost:${REDIRECT_PORT}`);
+      if (url.pathname !== '/callback') {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
+
+      const code = url.searchParams.get('code');
+      const error = url.searchParams.get('error');
+
+      if (error || !code) {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end('<html><body><h2>Authorization failed.</h2><p>You can close this tab.</p></body></html>');
+        server.close();
+        resolve({ error: error || 'No authorization code received' });
+        return;
+      }
+
+      try {
+        // Exchange code for tokens
+        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            code,
+            client_id: creds.clientId,
+            client_secret: creds.clientSecret,
+            redirect_uri: REDIRECT_URI,
+            grant_type: 'authorization_code'
+          })
+        });
+        const tokenData = await tokenResponse.json();
+
+        if (!tokenData.refresh_token) {
+          res.writeHead(200, { 'Content-Type': 'text/html' });
+          res.end('<html><body><h2>No refresh token received.</h2><p>Try revoking access at myaccount.google.com/permissions first.</p></body></html>');
+          server.close();
+          resolve({ error: 'No refresh token in response. Revoke app access in Google account settings and retry.' });
+          return;
+        }
+
+        // Update credentials in all email accounts and calendar sources
+        const newRefreshToken = tokenData.refresh_token;
+        if (config.email?.accounts) {
+          for (const acct of config.email.accounts) {
+            if (acct.credentials?.clientId === creds.clientId) {
+              acct.credentials.refreshToken = newRefreshToken;
+            }
+          }
+        }
+        if (config.calendar?.sources) {
+          for (const src of config.calendar.sources) {
+            if (src.credentials?.clientId === creds.clientId) {
+              src.credentials.refreshToken = newRefreshToken;
+            }
+          }
+        }
+
+        // Save to config file
+        const configPath = path.join(SPOCKAI_DIR, 'config.json');
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+
+        // Update vault if present
+        const vault = loadVault();
+        if (vault && vault.keys['google-oauth']) {
+          vault.keys['google-oauth'].keys.refreshToken = newRefreshToken;
+          saveVault(vault);
+        }
+
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end('<html><body><h2>Google authorization successful!</h2><p>You can close this tab and return to SpockAI.</p></body></html>');
+        server.close();
+        resolve({ success: true, message: 'Google OAuth re-authorized with expanded scopes. New refresh token saved.' });
+      } catch (err) {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end('<html><body><h2>Token exchange failed.</h2></body></html>');
+        server.close();
+        resolve({ error: err.message });
+      }
+    });
+
+    server.listen(REDIRECT_PORT, () => {
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${encodeURIComponent(creds.clientId)}` +
+        `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+        `&response_type=code` +
+        `&scope=${encodeURIComponent(SCOPES)}` +
+        `&access_type=offline` +
+        `&prompt=consent`;
+
+      shell.openExternal(authUrl);
+    });
+
+    // Timeout after 5 minutes
+    setTimeout(() => {
+      server.close();
+      resolve({ error: 'Authorization timed out after 5 minutes' });
+    }, 5 * 60 * 1000);
+  });
+}
+
 // Query Google Calendar events
 async function queryCalendar(timeRange = 'today') {
   if (!config?.calendar?.sources?.length) {
@@ -472,12 +596,17 @@ async function queryCalendar(timeRange = 'today') {
       if (data.items) {
         for (const event of data.items) {
           allEvents.push({
+            eventId: event.id,
+            calendarId: source.calendarId,
             calendar: source.name,
             title: event.summary || '(No title)',
             start: event.start?.dateTime || event.start?.date,
             end: event.end?.dateTime || event.end?.date,
             location: event.location || null,
-            isAllDay: !event.start?.dateTime
+            description: event.description || null,
+            attendees: event.attendees?.map(a => ({ email: a.email, responseStatus: a.responseStatus })) || [],
+            isAllDay: !event.start?.dateTime,
+            htmlLink: event.htmlLink
           });
         }
       }
@@ -543,6 +672,8 @@ async function queryEmails(filter = 'unread') {
         ) || false;
 
         allEmails.push({
+          messageId: msg.id,
+          threadId: msgData.threadId,
           account: account.name,
           from: from.replace(/<[^>]+>/, '').trim() || senderEmail,
           subject,
@@ -623,13 +754,15 @@ async function queryBeads(filter = 'open') {
 }
 
 // Create a calendar event
-async function createCalendarEvent(title, startTime, endTime, description = '', location = '') {
+async function createCalendarEvent(title, startTime, endTime, description = '', location = '', attendees = [], calendarId = null) {
   if (!config?.calendar?.sources?.length) {
     return { error: 'No calendars configured' };
   }
 
-  // Use the primary calendar (first enabled one)
-  const source = config.calendar.sources.find(s => s.enabled && s.credentials?.refreshToken);
+  // Use specified calendar or primary (first enabled one)
+  const source = calendarId
+    ? config.calendar.sources.find(s => s.calendarId === calendarId && s.credentials?.refreshToken)
+    : config.calendar.sources.find(s => s.enabled && s.credentials?.refreshToken);
   if (!source) {
     return { error: 'No calendar with credentials found' };
   }
@@ -673,6 +806,10 @@ async function createCalendarEvent(title, startTime, endTime, description = '', 
       }
     };
 
+    if (attendees.length > 0) {
+      event.attendees = attendees.map(email => ({ email }));
+    }
+
     const response = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(source.calendarId)}/events`,
       {
@@ -701,6 +838,278 @@ async function createCalendarEvent(title, startTime, endTime, description = '', 
     }
   } catch (error) {
     console.error('Calendar event creation failed:', error);
+    return { error: error.message };
+  }
+}
+
+// Update an existing calendar event
+async function updateCalendarEvent(eventId, updates, calendarId = 'primary') {
+  const source = config?.calendar?.sources?.find(s =>
+    (s.calendarId === calendarId || calendarId === 'primary') && s.enabled && s.credentials?.refreshToken
+  );
+  if (!source) return { error: 'No calendar with credentials found' };
+
+  try {
+    const accessToken = await getGoogleAccessToken(source.credentials);
+    if (!accessToken) return { error: 'Failed to get access token' };
+
+    const patch = {};
+    if (updates.title) patch.summary = updates.title;
+    if (updates.description !== undefined) patch.description = updates.description;
+    if (updates.location !== undefined) patch.location = updates.location;
+    if (updates.start_time) {
+      const startDate = /^\d{1,2}(:\d{2})?\s*(am|pm)?$/i.test(updates.start_time)
+        ? parseTimeString(updates.start_time, new Date())
+        : new Date(updates.start_time);
+      patch.start = { dateTime: startDate.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+    }
+    if (updates.end_time) {
+      const endDate = /^\d{1,2}(:\d{2})?\s*(am|pm)?$/i.test(updates.end_time)
+        ? parseTimeString(updates.end_time, new Date())
+        : new Date(updates.end_time);
+      patch.end = { dateTime: endDate.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+    }
+    if (updates.attendees) {
+      patch.attendees = updates.attendees.map(email => ({ email }));
+    }
+
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(source.calendarId)}/events/${eventId}`,
+      {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch)
+      }
+    );
+    const data = await response.json();
+
+    if (data.id) {
+      return {
+        success: true, eventId: data.id, title: data.summary,
+        start: data.start?.dateTime || data.start?.date,
+        end: data.end?.dateTime || data.end?.date, htmlLink: data.htmlLink
+      };
+    }
+    return { error: data.error?.message || 'Failed to update event' };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// Delete a calendar event
+async function deleteCalendarEvent(eventId, calendarId = 'primary') {
+  const source = config?.calendar?.sources?.find(s =>
+    (s.calendarId === calendarId || calendarId === 'primary') && s.enabled && s.credentials?.refreshToken
+  );
+  if (!source) return { error: 'No calendar with credentials found' };
+
+  try {
+    const accessToken = await getGoogleAccessToken(source.credentials);
+    if (!accessToken) return { error: 'Failed to get access token' };
+
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(source.calendarId)}/events/${eventId}`,
+      { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    if (response.status === 204 || response.ok) {
+      return { success: true, eventId, deleted: true };
+    }
+    const data = await response.json();
+    return { error: data.error?.message || 'Failed to delete event' };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// RSVP to a calendar event (accept/decline/tentative)
+async function rsvpCalendarEvent(eventId, rsvpResponse, calendarId = 'primary') {
+  const source = config?.calendar?.sources?.find(s =>
+    (s.calendarId === calendarId || calendarId === 'primary') && s.enabled && s.credentials?.refreshToken
+  );
+  if (!source) return { error: 'No calendar with credentials found' };
+
+  const validResponses = ['accepted', 'declined', 'tentative'];
+  if (!validResponses.includes(rsvpResponse)) {
+    return { error: `Invalid response: ${rsvpResponse}. Use: accepted, declined, tentative` };
+  }
+
+  try {
+    const accessToken = await getGoogleAccessToken(source.credentials);
+    if (!accessToken) return { error: 'Failed to get access token' };
+
+    // Get current event to find our email in attendees
+    const getResponse = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(source.calendarId)}/events/${eventId}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const eventData = await getResponse.json();
+    if (eventData.error) return { error: eventData.error.message };
+
+    // Update self in attendees
+    const attendees = eventData.attendees || [];
+    const selfAttendee = attendees.find(a => a.self);
+    if (selfAttendee) {
+      selfAttendee.responseStatus = rsvpResponse;
+    } else {
+      return { error: 'You are not an attendee of this event' };
+    }
+
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(source.calendarId)}/events/${eventId}`,
+      {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attendees })
+      }
+    );
+    const data = await response.json();
+
+    if (data.id) {
+      return { success: true, eventId: data.id, title: data.summary, rsvp: rsvpResponse };
+    }
+    return { error: data.error?.message || 'Failed to RSVP' };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// Search calendar events across all calendars
+async function searchCalendarEvents(query, timeMin = null, timeMax = null) {
+  if (!config?.calendar?.sources?.length) return { error: 'No calendars configured' };
+
+  const now = new Date();
+  if (!timeMin) timeMin = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days back
+  if (!timeMax) timeMax = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString(); // 90 days ahead
+
+  const allEvents = [];
+
+  for (const source of config.calendar.sources) {
+    if (!source.enabled || !source.credentials?.refreshToken) continue;
+
+    try {
+      const accessToken = await getGoogleAccessToken(source.credentials);
+      if (!accessToken) continue;
+
+      const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(source.calendarId)}/events?` +
+        `timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime&maxResults=50&q=${encodeURIComponent(query)}`;
+
+      const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const data = await response.json();
+
+      if (data.items) {
+        for (const event of data.items) {
+          allEvents.push({
+            eventId: event.id, calendarId: source.calendarId, calendar: source.name,
+            title: event.summary || '(No title)',
+            start: event.start?.dateTime || event.start?.date,
+            end: event.end?.dateTime || event.end?.date,
+            location: event.location || null, description: event.description || null,
+            htmlLink: event.htmlLink
+          });
+        }
+      }
+    } catch (error) {
+      // Skip failed calendars
+    }
+  }
+
+  allEvents.sort((a, b) => new Date(a.start) - new Date(b.start));
+  return { query, resultCount: allEvents.length, events: allEvents };
+}
+
+// Create a recurring calendar event
+async function createRecurringEvent(title, startTime, endTime, recurrence, description = '', location = '', calendarId = null) {
+  const source = calendarId
+    ? config?.calendar?.sources?.find(s => s.calendarId === calendarId && s.credentials?.refreshToken)
+    : config?.calendar?.sources?.find(s => s.enabled && s.credentials?.refreshToken);
+  if (!source) return { error: 'No calendar with credentials found' };
+
+  try {
+    const accessToken = await getGoogleAccessToken(source.credentials);
+    if (!accessToken) return { error: 'Failed to get access token' };
+
+    let startDate, endDate;
+    if (/^\d{1,2}(:\d{2})?\s*(am|pm)?$/i.test(startTime)) {
+      startDate = parseTimeString(startTime, new Date());
+      endDate = endTime ? parseTimeString(endTime, new Date()) : new Date(startDate.getTime() + 60 * 60 * 1000);
+    } else {
+      startDate = new Date(startTime);
+      endDate = endTime ? new Date(endTime) : new Date(startDate.getTime() + 60 * 60 * 1000);
+    }
+
+    // Build RRULE from friendly recurrence string
+    let rrule = recurrence;
+    if (!recurrence.startsWith('RRULE:')) {
+      const freq = recurrence.toLowerCase();
+      if (freq === 'daily') rrule = 'RRULE:FREQ=DAILY';
+      else if (freq === 'weekly') rrule = 'RRULE:FREQ=WEEKLY';
+      else if (freq === 'biweekly') rrule = 'RRULE:FREQ=WEEKLY;INTERVAL=2';
+      else if (freq === 'monthly') rrule = 'RRULE:FREQ=MONTHLY';
+      else if (freq === 'yearly') rrule = 'RRULE:FREQ=YEARLY';
+      else if (freq.startsWith('every ')) {
+        // "every monday", "every tuesday and thursday"
+        const days = freq.replace('every ', '').split(/\s+and\s+|\s*,\s*/);
+        const dayMap = { sunday: 'SU', monday: 'MO', tuesday: 'TU', wednesday: 'WE', thursday: 'TH', friday: 'FR', saturday: 'SA' };
+        const byDay = days.map(d => dayMap[d.toLowerCase()]).filter(Boolean).join(',');
+        rrule = byDay ? `RRULE:FREQ=WEEKLY;BYDAY=${byDay}` : `RRULE:FREQ=DAILY`;
+      }
+    }
+
+    const event = {
+      summary: title, description, location,
+      start: { dateTime: startDate.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+      end: { dateTime: endDate.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+      recurrence: [rrule]
+    };
+
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(source.calendarId)}/events`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(event)
+      }
+    );
+    const data = await response.json();
+
+    if (data.id) {
+      return { success: true, eventId: data.id, title: data.summary, recurrence: data.recurrence, htmlLink: data.htmlLink };
+    }
+    return { error: data.error?.message || 'Failed to create recurring event' };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// List all accessible Google Calendars
+async function listCalendars() {
+  if (!config?.calendar?.sources?.length) return { error: 'No calendars configured' };
+
+  const source = config.calendar.sources.find(s => s.enabled && s.credentials?.refreshToken);
+  if (!source) return { error: 'No calendar with credentials found' };
+
+  try {
+    const accessToken = await getGoogleAccessToken(source.credentials);
+    if (!accessToken) return { error: 'Failed to get access token' };
+
+    const response = await fetch(
+      'https://www.googleapis.com/calendar/v3/users/me/calendarList',
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const data = await response.json();
+
+    if (data.items) {
+      return {
+        calendars: data.items.map(c => ({
+          id: c.id, name: c.summary, description: c.description || null,
+          primary: c.primary || false, accessRole: c.accessRole,
+          backgroundColor: c.backgroundColor
+        }))
+      };
+    }
+    return { error: data.error?.message || 'Failed to list calendars' };
+  } catch (error) {
     return { error: error.message };
   }
 }
@@ -788,6 +1197,854 @@ async function sendEmail(to, subject, body) {
     }
   } catch (error) {
     console.error('Email send failed:', error);
+    return { error: error.message };
+  }
+}
+
+// Read full email content by message ID
+async function readEmail(messageId) {
+  const account = config?.email?.accounts?.find(a => a.enabled && a.credentials?.refreshToken);
+  if (!account) return { error: 'No email account configured' };
+
+  try {
+    const accessToken = await getGoogleAccessToken(account.credentials);
+    if (!accessToken) return { error: 'Failed to get access token' };
+
+    const response = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const data = await response.json();
+    if (data.error) return { error: data.error.message };
+
+    const headers = data.payload?.headers || [];
+    const getHeader = (name) => headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';
+
+    // Extract body from parts
+    const extractBody = (payload) => {
+      if (payload.body?.data) {
+        return Buffer.from(payload.body.data, 'base64url').toString('utf-8');
+      }
+      if (payload.parts) {
+        for (const part of payload.parts) {
+          if (part.mimeType === 'text/plain' && part.body?.data) {
+            return Buffer.from(part.body.data, 'base64url').toString('utf-8');
+          }
+        }
+        for (const part of payload.parts) {
+          if (part.mimeType === 'text/html' && part.body?.data) {
+            return Buffer.from(part.body.data, 'base64url').toString('utf-8');
+          }
+        }
+        for (const part of payload.parts) {
+          const nested = extractBody(part);
+          if (nested) return nested;
+        }
+      }
+      return '';
+    };
+
+    const attachments = [];
+    const findAttachments = (payload) => {
+      if (payload.filename && payload.body?.attachmentId) {
+        attachments.push({ filename: payload.filename, mimeType: payload.mimeType, size: payload.body.size });
+      }
+      if (payload.parts) payload.parts.forEach(findAttachments);
+    };
+    findAttachments(data.payload);
+
+    return {
+      messageId: data.id,
+      threadId: data.threadId,
+      from: getHeader('From'),
+      to: getHeader('To'),
+      cc: getHeader('Cc'),
+      subject: getHeader('Subject'),
+      date: getHeader('Date'),
+      body: extractBody(data.payload),
+      snippet: data.snippet,
+      labels: data.labelIds,
+      attachments
+    };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// Reply to an email in the same thread
+async function replyToEmail(messageId, body) {
+  const account = config?.email?.accounts?.find(a => a.enabled && a.credentials?.refreshToken);
+  if (!account) return { error: 'No email account configured' };
+
+  try {
+    const accessToken = await getGoogleAccessToken(account.credentials);
+    if (!accessToken) return { error: 'Failed to get access token' };
+
+    // Get original message for thread info and headers
+    const origResponse = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Message-ID`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const origData = await origResponse.json();
+    if (origData.error) return { error: origData.error.message };
+
+    const origHeaders = origData.payload?.headers || [];
+    const originalFrom = origHeaders.find(h => h.name === 'From')?.value || '';
+    const originalSubject = origHeaders.find(h => h.name === 'Subject')?.value || '';
+    const originalMessageId = origHeaders.find(h => h.name === 'Message-ID')?.value || '';
+
+    const replySubject = originalSubject.startsWith('Re: ') ? originalSubject : `Re: ${originalSubject}`;
+    const replyTo = originalFrom;
+
+    const emailLines = [
+      `To: ${replyTo}`,
+      `Subject: ${replySubject}`,
+      `In-Reply-To: ${originalMessageId}`,
+      `References: ${originalMessageId}`,
+      'Content-Type: text/plain; charset=utf-8',
+      '',
+      body
+    ];
+    const encodedMessage = Buffer.from(emailLines.join('\r\n'))
+      .toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+    const response = await fetch(
+      'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw: encodedMessage, threadId: origData.threadId })
+      }
+    );
+    const data = await response.json();
+
+    if (data.id) {
+      return { success: true, messageId: data.id, threadId: data.threadId, replyTo, subject: replySubject };
+    }
+    return { error: data.error?.message || 'Failed to send reply' };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// Forward an email to another recipient
+async function forwardEmail(messageId, to, comment = '') {
+  const account = config?.email?.accounts?.find(a => a.enabled && a.credentials?.refreshToken);
+  if (!account) return { error: 'No email account configured' };
+
+  try {
+    const accessToken = await getGoogleAccessToken(account.credentials);
+    if (!accessToken) return { error: 'Failed to get access token' };
+
+    // Get original message full content
+    const origResponse = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const origData = await origResponse.json();
+    if (origData.error) return { error: origData.error.message };
+
+    const origHeaders = origData.payload?.headers || [];
+    const originalFrom = origHeaders.find(h => h.name === 'From')?.value || '';
+    const originalSubject = origHeaders.find(h => h.name === 'Subject')?.value || '';
+    const originalDate = origHeaders.find(h => h.name === 'Date')?.value || '';
+
+    // Extract original body
+    const extractText = (payload) => {
+      if (payload.body?.data) return Buffer.from(payload.body.data, 'base64url').toString('utf-8');
+      if (payload.parts) {
+        for (const part of payload.parts) {
+          if (part.mimeType === 'text/plain' && part.body?.data) {
+            return Buffer.from(part.body.data, 'base64url').toString('utf-8');
+          }
+        }
+        for (const part of payload.parts) {
+          const nested = extractText(part);
+          if (nested) return nested;
+        }
+      }
+      return '';
+    };
+
+    const originalBody = extractText(origData.payload);
+    const fwdSubject = originalSubject.startsWith('Fwd: ') ? originalSubject : `Fwd: ${originalSubject}`;
+    const fwdBody = `${comment ? comment + '\n\n' : ''}---------- Forwarded message ----------\nFrom: ${originalFrom}\nDate: ${originalDate}\nSubject: ${originalSubject}\n\n${originalBody}`;
+
+    const emailLines = [
+      `To: ${to}`,
+      `Subject: ${fwdSubject}`,
+      'Content-Type: text/plain; charset=utf-8',
+      '',
+      fwdBody
+    ];
+    const encodedMessage = Buffer.from(emailLines.join('\r\n'))
+      .toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+    const response = await fetch(
+      'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw: encodedMessage })
+      }
+    );
+    const data = await response.json();
+
+    if (data.id) {
+      return { success: true, messageId: data.id, forwardedTo: to, subject: fwdSubject };
+    }
+    return { error: data.error?.message || 'Failed to forward email' };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// Modify email (mark read/unread, star, archive, trash)
+async function modifyEmail(messageId, action) {
+  const account = config?.email?.accounts?.find(a => a.enabled && a.credentials?.refreshToken);
+  if (!account) return { error: 'No email account configured' };
+
+  try {
+    const accessToken = await getGoogleAccessToken(account.credentials);
+    if (!accessToken) return { error: 'Failed to get access token' };
+
+    const modifications = {};
+    switch (action) {
+      case 'mark_read':
+        modifications.removeLabelIds = ['UNREAD'];
+        break;
+      case 'mark_unread':
+        modifications.addLabelIds = ['UNREAD'];
+        break;
+      case 'star':
+        modifications.addLabelIds = ['STARRED'];
+        break;
+      case 'unstar':
+        modifications.removeLabelIds = ['STARRED'];
+        break;
+      case 'archive':
+        modifications.removeLabelIds = ['INBOX'];
+        break;
+      case 'trash':
+        modifications.addLabelIds = ['TRASH'];
+        modifications.removeLabelIds = ['INBOX'];
+        break;
+      case 'untrash':
+        modifications.removeLabelIds = ['TRASH'];
+        modifications.addLabelIds = ['INBOX'];
+        break;
+      case 'spam':
+        modifications.addLabelIds = ['SPAM'];
+        modifications.removeLabelIds = ['INBOX'];
+        break;
+      default:
+        return { error: `Unknown action: ${action}. Use: mark_read, mark_unread, star, unstar, archive, trash, untrash, spam` };
+    }
+
+    const response = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/modify`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(modifications)
+      }
+    );
+    const data = await response.json();
+
+    if (data.id) {
+      return { success: true, messageId: data.id, action, labels: data.labelIds };
+    }
+    return { error: data.error?.message || 'Failed to modify email' };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// Search emails with Gmail search syntax
+async function searchEmails(query, maxResults = 10) {
+  const account = config?.email?.accounts?.find(a => a.enabled && a.credentials?.refreshToken);
+  if (!account) return { error: 'No email account configured' };
+
+  try {
+    const accessToken = await getGoogleAccessToken(account.credentials);
+    if (!accessToken) return { error: 'Failed to get access token' };
+
+    const listUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${maxResults}&q=${encodeURIComponent(query)}`;
+    const listResponse = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const listData = await listResponse.json();
+
+    if (!listData.messages?.length) return { query, resultCount: 0, emails: [] };
+
+    const emails = [];
+    for (const msg of listData.messages) {
+      const msgUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`;
+      const msgResponse = await fetch(msgUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const msgData = await msgResponse.json();
+      const headers = msgData.payload?.headers || [];
+
+      emails.push({
+        messageId: msg.id,
+        threadId: msgData.threadId,
+        from: headers.find(h => h.name === 'From')?.value || '',
+        subject: headers.find(h => h.name === 'Subject')?.value || '(no subject)',
+        date: headers.find(h => h.name === 'Date')?.value || '',
+        snippet: msgData.snippet?.substring(0, 100),
+        labels: msgData.labelIds
+      });
+    }
+
+    return { query, resultCount: emails.length, totalEstimate: listData.resultSizeEstimate, emails };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// List all Gmail labels
+async function listEmailLabels() {
+  const account = config?.email?.accounts?.find(a => a.enabled && a.credentials?.refreshToken);
+  if (!account) return { error: 'No email account configured' };
+
+  try {
+    const accessToken = await getGoogleAccessToken(account.credentials);
+    if (!accessToken) return { error: 'Failed to get access token' };
+
+    const response = await fetch(
+      'https://gmail.googleapis.com/gmail/v1/users/me/labels',
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const data = await response.json();
+
+    if (data.labels) {
+      return {
+        labels: data.labels.map(l => ({
+          id: l.id,
+          name: l.name,
+          type: l.type,
+          messagesTotal: l.messagesTotal,
+          messagesUnread: l.messagesUnread
+        }))
+      };
+    }
+    return { error: data.error?.message || 'Failed to list labels' };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// Apply or remove labels from an email
+async function applyEmailLabel(messageId, addLabelIds = [], removeLabelIds = []) {
+  const account = config?.email?.accounts?.find(a => a.enabled && a.credentials?.refreshToken);
+  if (!account) return { error: 'No email account configured' };
+
+  try {
+    const accessToken = await getGoogleAccessToken(account.credentials);
+    if (!accessToken) return { error: 'Failed to get access token' };
+
+    const response = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/modify`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addLabelIds, removeLabelIds })
+      }
+    );
+    const data = await response.json();
+
+    if (data.id) {
+      return { success: true, messageId: data.id, labels: data.labelIds };
+    }
+    return { error: data.error?.message || 'Failed to modify labels' };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// ============================================
+// MICROSOFT OUTLOOK (Graph API)
+// ============================================
+
+// Re-authorize Microsoft OAuth with delegated permissions
+async function reauthorizeMicrosoft() {
+  const msConfig = config?.outlook || config?.teams;
+  if (!msConfig?.clientId || !msConfig?.tenantId) {
+    return { error: 'Microsoft/Outlook not configured. Need tenantId and clientId in config.outlook or config.teams.' };
+  }
+
+  const SCOPES = 'offline_access Mail.ReadWrite Mail.Send Calendars.ReadWrite';
+  const REDIRECT_PORT = 39848;
+  const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}/callback`;
+
+  return new Promise((resolve) => {
+    const server = http.createServer(async (req, res) => {
+      const url = new URL(req.url, `http://localhost:${REDIRECT_PORT}`);
+      if (url.pathname !== '/callback') { res.writeHead(404); res.end(); return; }
+
+      const code = url.searchParams.get('code');
+      const error = url.searchParams.get('error');
+
+      if (error || !code) {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end('<html><body><h2>Authorization failed.</h2><p>You can close this tab.</p></body></html>');
+        server.close();
+        resolve({ error: error || 'No authorization code received' });
+        return;
+      }
+
+      try {
+        const tokenResponse = await fetch(
+          `https://login.microsoftonline.com/${msConfig.tenantId}/oauth2/v2.0/token`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              client_id: msConfig.clientId,
+              client_secret: msConfig.clientSecret,
+              code,
+              redirect_uri: REDIRECT_URI,
+              grant_type: 'authorization_code',
+              scope: SCOPES
+            })
+          }
+        );
+        const tokenData = await tokenResponse.json();
+
+        if (!tokenData.refresh_token) {
+          res.writeHead(200, { 'Content-Type': 'text/html' });
+          res.end('<html><body><h2>No refresh token received.</h2></body></html>');
+          server.close();
+          resolve({ error: 'No refresh token in Microsoft response' });
+          return;
+        }
+
+        // Store in config
+        if (!config.outlook) config.outlook = { enabled: true, tenantId: msConfig.tenantId, clientId: msConfig.clientId, clientSecret: msConfig.clientSecret };
+        config.outlook.refreshToken = tokenData.refresh_token;
+        fs.writeFileSync(path.join(SPOCKAI_DIR, 'config.json'), JSON.stringify(config, null, 2));
+
+        // Store in vault
+        const vault = loadVault();
+        if (vault) {
+          if (!vault.keys['microsoft-outlook']) {
+            vault.keys['microsoft-outlook'] = { source: 'Microsoft', label: 'Outlook (Mail + Calendar)', keys: {} };
+          }
+          vault.keys['microsoft-outlook'].keys.refreshToken = tokenData.refresh_token;
+          vault.keys['microsoft-outlook'].keys.tenantId = msConfig.tenantId;
+          vault.keys['microsoft-outlook'].keys.clientId = msConfig.clientId;
+          vault.keys['microsoft-outlook'].keys.clientSecret = msConfig.clientSecret;
+          saveVault(vault);
+        }
+
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end('<html><body><h2>Microsoft authorization successful!</h2><p>You can close this tab.</p></body></html>');
+        server.close();
+        resolve({ success: true, message: 'Microsoft OAuth authorized. Refresh token saved.' });
+      } catch (err) {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end('<html><body><h2>Token exchange failed.</h2></body></html>');
+        server.close();
+        resolve({ error: err.message });
+      }
+    });
+
+    server.listen(REDIRECT_PORT, () => {
+      const authUrl = `https://login.microsoftonline.com/${msConfig.tenantId}/oauth2/v2.0/authorize?` +
+        `client_id=${encodeURIComponent(msConfig.clientId)}` +
+        `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+        `&response_type=code` +
+        `&scope=${encodeURIComponent(SCOPES)}` +
+        `&response_mode=query`;
+
+      shell.openExternal(authUrl);
+    });
+
+    setTimeout(() => { server.close(); resolve({ error: 'Authorization timed out after 5 minutes' }); }, 5 * 60 * 1000);
+  });
+}
+
+// Get Microsoft Graph access token from refresh token
+async function getMicrosoftAccessToken() {
+  const msConfig = config?.outlook || {};
+  if (!msConfig.refreshToken || !msConfig.tenantId || !msConfig.clientId) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(
+      `https://login.microsoftonline.com/${msConfig.tenantId}/oauth2/v2.0/token`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: msConfig.clientId,
+          client_secret: msConfig.clientSecret,
+          refresh_token: msConfig.refreshToken,
+          grant_type: 'refresh_token',
+          scope: 'offline_access Mail.ReadWrite Mail.Send Calendars.ReadWrite'
+        })
+      }
+    );
+    const data = await response.json();
+    return data.access_token || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+// Query Outlook emails
+async function queryOutlookEmails(filter = 'unread', maxResults = 10) {
+  const accessToken = await getMicrosoftAccessToken();
+  if (!accessToken) return { error: 'Outlook not configured or token expired. Use reauthorize_microsoft first.' };
+
+  try {
+    let filterQuery = '';
+    if (filter === 'unread') filterQuery = '&$filter=isRead eq false';
+    else if (filter === 'flagged') filterQuery = '&$filter=flag/flagStatus eq \'flagged\'';
+    else if (filter === 'important') filterQuery = '&$filter=importance eq \'high\'';
+
+    const response = await fetch(
+      `https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=${maxResults}&$orderby=receivedDateTime desc${filterQuery}` +
+      '&$select=id,subject,from,receivedDateTime,isRead,bodyPreview,importance,flag',
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const data = await response.json();
+
+    if (data.value) {
+      return {
+        filter,
+        emailCount: data.value.length,
+        emails: data.value.map(m => ({
+          messageId: m.id,
+          from: m.from?.emailAddress?.name || m.from?.emailAddress?.address || '',
+          fromEmail: m.from?.emailAddress?.address || '',
+          subject: m.subject || '(no subject)',
+          date: m.receivedDateTime,
+          isRead: m.isRead,
+          importance: m.importance,
+          flagged: m.flag?.flagStatus === 'flagged',
+          snippet: m.bodyPreview?.substring(0, 100)
+        }))
+      };
+    }
+    return { error: data.error?.message || 'Failed to query Outlook emails' };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// Read full Outlook email
+async function readOutlookEmail(messageId) {
+  const accessToken = await getMicrosoftAccessToken();
+  if (!accessToken) return { error: 'Outlook not configured or token expired.' };
+
+  try {
+    const response = await fetch(
+      `https://graph.microsoft.com/v1.0/me/messages/${messageId}?$select=id,subject,from,toRecipients,ccRecipients,body,receivedDateTime,hasAttachments,attachments,importance`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const data = await response.json();
+    if (data.error) return { error: data.error.message };
+
+    return {
+      messageId: data.id,
+      from: data.from?.emailAddress?.address || '',
+      to: data.toRecipients?.map(r => r.emailAddress?.address).join(', ') || '',
+      cc: data.ccRecipients?.map(r => r.emailAddress?.address).join(', ') || '',
+      subject: data.subject,
+      date: data.receivedDateTime,
+      body: data.body?.content || '',
+      bodyType: data.body?.contentType || 'text',
+      importance: data.importance,
+      hasAttachments: data.hasAttachments,
+      attachments: data.attachments?.map(a => ({ name: a.name, contentType: a.contentType, size: a.size })) || []
+    };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// Send Outlook email
+async function sendOutlookEmail(to, subject, body, cc = '', bcc = '') {
+  const accessToken = await getMicrosoftAccessToken();
+  if (!accessToken) return { error: 'Outlook not configured or token expired.' };
+
+  try {
+    const message = {
+      subject,
+      body: { contentType: 'Text', content: body },
+      toRecipients: to.split(',').map(e => ({ emailAddress: { address: e.trim() } }))
+    };
+    if (cc) message.ccRecipients = cc.split(',').map(e => ({ emailAddress: { address: e.trim() } }));
+    if (bcc) message.bccRecipients = bcc.split(',').map(e => ({ emailAddress: { address: e.trim() } }));
+
+    const response = await fetch(
+      'https://graph.microsoft.com/v1.0/me/sendMail',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+      }
+    );
+
+    if (response.status === 202 || response.ok) {
+      return { success: true, to, subject };
+    }
+    const data = await response.json();
+    return { error: data.error?.message || 'Failed to send Outlook email' };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// Modify Outlook email (mark read/unread, flag, move, delete)
+async function modifyOutlookEmail(messageId, action) {
+  const accessToken = await getMicrosoftAccessToken();
+  if (!accessToken) return { error: 'Outlook not configured or token expired.' };
+
+  try {
+    let url = `https://graph.microsoft.com/v1.0/me/messages/${messageId}`;
+    let method = 'PATCH';
+    let body = null;
+
+    switch (action) {
+      case 'mark_read':
+        body = JSON.stringify({ isRead: true });
+        break;
+      case 'mark_unread':
+        body = JSON.stringify({ isRead: false });
+        break;
+      case 'flag':
+        body = JSON.stringify({ flag: { flagStatus: 'flagged' } });
+        break;
+      case 'unflag':
+        body = JSON.stringify({ flag: { flagStatus: 'notFlagged' } });
+        break;
+      case 'archive':
+        url = `https://graph.microsoft.com/v1.0/me/messages/${messageId}/move`;
+        method = 'POST';
+        body = JSON.stringify({ destinationId: 'archive' });
+        break;
+      case 'delete':
+        method = 'DELETE';
+        break;
+      default:
+        return { error: `Unknown action: ${action}. Use: mark_read, mark_unread, flag, unflag, archive, delete` };
+    }
+
+    const options = { method, headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } };
+    if (body) options.body = body;
+
+    const response = await fetch(url, options);
+
+    if (response.ok || response.status === 204) {
+      return { success: true, messageId, action };
+    }
+    const data = await response.json().catch(() => ({}));
+    return { error: data.error?.message || `Failed to ${action} Outlook email` };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// Reply to Outlook email
+async function replyOutlookEmail(messageId, body) {
+  const accessToken = await getMicrosoftAccessToken();
+  if (!accessToken) return { error: 'Outlook not configured or token expired.' };
+
+  try {
+    const response = await fetch(
+      `https://graph.microsoft.com/v1.0/me/messages/${messageId}/reply`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment: body })
+      }
+    );
+
+    if (response.status === 202 || response.ok) {
+      return { success: true, messageId, action: 'replied' };
+    }
+    const data = await response.json().catch(() => ({}));
+    return { error: data.error?.message || 'Failed to reply to Outlook email' };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// ============================================
+// MICROSOFT OUTLOOK CALENDAR (Graph API)
+// ============================================
+
+// Query Outlook calendar events
+async function queryOutlookCalendar(timeRange = 'today') {
+  const accessToken = await getMicrosoftAccessToken();
+  if (!accessToken) return { error: 'Outlook not configured or token expired. Use reauthorize_microsoft first.' };
+
+  const now = new Date();
+  let startDateTime, endDateTime;
+
+  switch (timeRange) {
+    case 'today':
+      startDateTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      endDateTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
+      break;
+    case 'tomorrow': {
+      const tmrw = new Date(now);
+      tmrw.setDate(tmrw.getDate() + 1);
+      startDateTime = new Date(tmrw.getFullYear(), tmrw.getMonth(), tmrw.getDate()).toISOString();
+      endDateTime = new Date(tmrw.getFullYear(), tmrw.getMonth(), tmrw.getDate(), 23, 59, 59).toISOString();
+      break;
+    }
+    case 'week':
+      startDateTime = now.toISOString();
+      endDateTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      break;
+    default:
+      startDateTime = now.toISOString();
+      endDateTime = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  try {
+    const response = await fetch(
+      `https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=${startDateTime}&endDateTime=${endDateTime}` +
+      '&$orderby=start/dateTime&$top=50&$select=id,subject,start,end,location,organizer,attendees,isAllDay,webLink',
+      { headers: { Authorization: `Bearer ${accessToken}`, Prefer: 'outlook.timezone="' + Intl.DateTimeFormat().resolvedOptions().timeZone + '"' } }
+    );
+    const data = await response.json();
+
+    if (data.value) {
+      return {
+        timeRange,
+        eventCount: data.value.length,
+        events: data.value.map(e => ({
+          eventId: e.id,
+          title: e.subject || '(No title)',
+          start: e.start?.dateTime,
+          end: e.end?.dateTime,
+          location: e.location?.displayName || null,
+          organizer: e.organizer?.emailAddress?.address || '',
+          attendees: e.attendees?.map(a => ({ email: a.emailAddress?.address, status: a.status?.response })) || [],
+          isAllDay: e.isAllDay,
+          webLink: e.webLink
+        }))
+      };
+    }
+    return { error: data.error?.message || 'Failed to query Outlook calendar' };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// Create Outlook calendar event
+async function createOutlookEvent(title, startTime, endTime, description = '', location = '', attendees = []) {
+  const accessToken = await getMicrosoftAccessToken();
+  if (!accessToken) return { error: 'Outlook not configured or token expired.' };
+
+  try {
+    let startDate, endDate;
+    if (/^\d{1,2}(:\d{2})?\s*(am|pm)?$/i.test(startTime)) {
+      startDate = parseTimeString(startTime, new Date());
+      endDate = endTime ? parseTimeString(endTime, new Date()) : new Date(startDate.getTime() + 60 * 60 * 1000);
+    } else {
+      startDate = new Date(startTime);
+      endDate = endTime ? new Date(endTime) : new Date(startDate.getTime() + 60 * 60 * 1000);
+    }
+
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const event = {
+      subject: title,
+      body: description ? { contentType: 'Text', content: description } : undefined,
+      start: { dateTime: startDate.toISOString(), timeZone: tz },
+      end: { dateTime: endDate.toISOString(), timeZone: tz },
+      location: location ? { displayName: location } : undefined,
+      attendees: attendees.length > 0
+        ? attendees.map(email => ({ emailAddress: { address: email }, type: 'required' }))
+        : undefined
+    };
+
+    const response = await fetch(
+      'https://graph.microsoft.com/v1.0/me/events',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(event)
+      }
+    );
+    const data = await response.json();
+
+    if (data.id) {
+      return {
+        success: true, eventId: data.id, title: data.subject,
+        start: data.start?.dateTime, end: data.end?.dateTime, webLink: data.webLink
+      };
+    }
+    return { error: data.error?.message || 'Failed to create Outlook event' };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// Update Outlook calendar event
+async function updateOutlookEvent(eventId, updates) {
+  const accessToken = await getMicrosoftAccessToken();
+  if (!accessToken) return { error: 'Outlook not configured or token expired.' };
+
+  try {
+    const patch = {};
+    if (updates.title) patch.subject = updates.title;
+    if (updates.description !== undefined) patch.body = { contentType: 'Text', content: updates.description };
+    if (updates.location !== undefined) patch.location = { displayName: updates.location };
+
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (updates.start_time) {
+      const startDate = /^\d{1,2}(:\d{2})?\s*(am|pm)?$/i.test(updates.start_time)
+        ? parseTimeString(updates.start_time, new Date()) : new Date(updates.start_time);
+      patch.start = { dateTime: startDate.toISOString(), timeZone: tz };
+    }
+    if (updates.end_time) {
+      const endDate = /^\d{1,2}(:\d{2})?\s*(am|pm)?$/i.test(updates.end_time)
+        ? parseTimeString(updates.end_time, new Date()) : new Date(updates.end_time);
+      patch.end = { dateTime: endDate.toISOString(), timeZone: tz };
+    }
+    if (updates.attendees) {
+      patch.attendees = updates.attendees.map(email => ({ emailAddress: { address: email }, type: 'required' }));
+    }
+
+    const response = await fetch(
+      `https://graph.microsoft.com/v1.0/me/events/${eventId}`,
+      {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch)
+      }
+    );
+    const data = await response.json();
+
+    if (data.id) {
+      return { success: true, eventId: data.id, title: data.subject, start: data.start?.dateTime, end: data.end?.dateTime };
+    }
+    return { error: data.error?.message || 'Failed to update Outlook event' };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// Delete Outlook calendar event
+async function deleteOutlookEvent(eventId) {
+  const accessToken = await getMicrosoftAccessToken();
+  if (!accessToken) return { error: 'Outlook not configured or token expired.' };
+
+  try {
+    const response = await fetch(
+      `https://graph.microsoft.com/v1.0/me/events/${eventId}`,
+      { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    if (response.status === 204 || response.ok) {
+      return { success: true, eventId, deleted: true };
+    }
+    const data = await response.json().catch(() => ({}));
+    return { error: data.error?.message || 'Failed to delete Outlook event' };
+  } catch (error) {
     return { error: error.message };
   }
 }
@@ -1008,6 +2265,49 @@ async function closeBead(issueId, reason = '') {
     console.error('Failed to close bead:', error);
     return { error: error.message || 'Failed to close beads issue' };
   }
+}
+
+// Batch create multiple beads at once
+async function batchCreateBeads(items) {
+  if (!config?.beans?.enabled || !config.beans.scanPaths?.length) {
+    return { error: 'BEANS not configured' };
+  }
+
+  const results = [];
+  for (const item of items) {
+    const result = await createBead(
+      item.title,
+      item.type || 'task',
+      item.priority ?? 2,
+      item.description || ''
+    );
+    results.push(result);
+  }
+
+  const succeeded = results.filter(r => r.success).length;
+  const failed = results.filter(r => r.error).length;
+
+  return {
+    total: items.length,
+    succeeded,
+    failed,
+    results
+  };
+}
+
+// Auto-create bead from conversation context with trigger reason
+async function autoCreateBeadFromContext(title, type = 'task', priority = 2, description = '', triggerReason = '') {
+  const result = await createBead(title, type, priority, description);
+
+  if (result.success && triggerReason) {
+    appendDailyLog(`Auto-created bead ${result.issueId}: "${title}" (P${priority}) - Trigger: ${triggerReason}`);
+  }
+
+  return {
+    ...result,
+    triggerReason,
+    autoCreated: true
+  };
 }
 
 // ============================================
@@ -2388,28 +3688,97 @@ const tools = [
     input_schema: {
       type: 'object',
       properties: {
-        title: {
-          type: 'string',
-          description: 'Title/name of the event'
-        },
-        start_time: {
-          type: 'string',
-          description: 'Start time (e.g., "3pm", "15:00", "2024-02-05T15:00:00")'
-        },
-        end_time: {
-          type: 'string',
-          description: 'End time (optional, defaults to 1 hour after start)'
-        },
-        description: {
-          type: 'string',
-          description: 'Event description (optional)'
-        },
-        location: {
-          type: 'string',
-          description: 'Event location (optional)'
-        }
+        title: { type: 'string', description: 'Title/name of the event' },
+        start_time: { type: 'string', description: 'Start time (e.g., "3pm", "15:00", "2024-02-05T15:00:00")' },
+        end_time: { type: 'string', description: 'End time (optional, defaults to 1 hour after start)' },
+        description: { type: 'string', description: 'Event description (optional)' },
+        location: { type: 'string', description: 'Event location (optional)' },
+        attendees: { type: 'array', items: { type: 'string' }, description: 'Email addresses of attendees (optional)' },
+        calendar_id: { type: 'string', description: 'Specific calendar ID to use (optional, defaults to primary)' }
       },
       required: ['title', 'start_time']
+    }
+  },
+  {
+    name: 'update_calendar_event',
+    description: 'Update an existing calendar event. Change title, time, location, description, or attendees.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        event_id: { type: 'string', description: 'Event ID from get_calendar_events results' },
+        title: { type: 'string', description: 'New title (optional)' },
+        start_time: { type: 'string', description: 'New start time (optional)' },
+        end_time: { type: 'string', description: 'New end time (optional)' },
+        description: { type: 'string', description: 'New description (optional)' },
+        location: { type: 'string', description: 'New location (optional)' },
+        attendees: { type: 'array', items: { type: 'string' }, description: 'Updated attendee emails (optional)' },
+        calendar_id: { type: 'string', description: 'Calendar ID (optional, defaults to primary)' }
+      },
+      required: ['event_id']
+    }
+  },
+  {
+    name: 'delete_calendar_event',
+    description: 'Delete a calendar event.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        event_id: { type: 'string', description: 'Event ID to delete' },
+        calendar_id: { type: 'string', description: 'Calendar ID (optional, defaults to primary)' }
+      },
+      required: ['event_id']
+    }
+  },
+  {
+    name: 'rsvp_calendar_event',
+    description: 'RSVP to a calendar event invitation. Accept, decline, or mark as tentative.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        event_id: { type: 'string', description: 'Event ID to RSVP to' },
+        response: { type: 'string', description: 'RSVP response: accepted, declined, or tentative' },
+        calendar_id: { type: 'string', description: 'Calendar ID (optional, defaults to primary)' }
+      },
+      required: ['event_id', 'response']
+    }
+  },
+  {
+    name: 'search_calendar_events',
+    description: 'Search for calendar events by text across all calendars. Optionally filter by date range.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search text (matches event title, description, location)' },
+        time_min: { type: 'string', description: 'Start of date range (ISO format, optional, defaults to 30 days ago)' },
+        time_max: { type: 'string', description: 'End of date range (ISO format, optional, defaults to 90 days ahead)' }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'create_recurring_event',
+    description: 'Create a recurring calendar event. Supports daily, weekly, biweekly, monthly, yearly, or custom recurrence like "every monday and wednesday".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Event title' },
+        start_time: { type: 'string', description: 'Start time for first occurrence' },
+        end_time: { type: 'string', description: 'End time (optional)' },
+        recurrence: { type: 'string', description: 'Recurrence pattern: daily, weekly, biweekly, monthly, yearly, "every monday", or RRULE format' },
+        description: { type: 'string', description: 'Event description (optional)' },
+        location: { type: 'string', description: 'Event location (optional)' },
+        calendar_id: { type: 'string', description: 'Calendar ID (optional)' }
+      },
+      required: ['title', 'start_time', 'recurrence']
+    }
+  },
+  {
+    name: 'list_calendars',
+    description: 'List all accessible Google Calendars with their IDs, names, and access roles.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+      required: []
     }
   },
   {
@@ -2432,6 +3801,219 @@ const tools = [
         }
       },
       required: ['to', 'subject', 'body']
+    }
+  },
+  {
+    name: 'reauthorize_google',
+    description: 'Re-authorize Google OAuth with expanded permissions. Use this when Gmail or Calendar operations return 403/401 errors, or when the user wants to upgrade OAuth scopes. Opens browser for consent.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'read_email',
+    description: 'Read the full content of an email by its message ID. Returns full body, headers, and attachment info. Use after get_emails to read a specific email.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message_id: { type: 'string', description: 'Gmail message ID from get_emails results' }
+      },
+      required: ['message_id']
+    }
+  },
+  {
+    name: 'reply_to_email',
+    description: 'Reply to an email in the same thread. Maintains conversation threading.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message_id: { type: 'string', description: 'Gmail message ID to reply to' },
+        body: { type: 'string', description: 'Reply body text' }
+      },
+      required: ['message_id', 'body']
+    }
+  },
+  {
+    name: 'forward_email',
+    description: 'Forward an email to another recipient with an optional comment.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message_id: { type: 'string', description: 'Gmail message ID to forward' },
+        to: { type: 'string', description: 'Recipient email address' },
+        comment: { type: 'string', description: 'Optional comment to prepend (optional)' }
+      },
+      required: ['message_id', 'to']
+    }
+  },
+  {
+    name: 'modify_email',
+    description: 'Modify an email: mark read/unread, star/unstar, archive, trash, or mark as spam.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message_id: { type: 'string', description: 'Gmail message ID' },
+        action: { type: 'string', description: 'Action: mark_read, mark_unread, star, unstar, archive, trash, untrash, spam' }
+      },
+      required: ['message_id', 'action']
+    }
+  },
+  {
+    name: 'search_emails',
+    description: 'Search emails using Gmail search syntax. Supports from:, subject:, has:attachment, before:, after:, is:starred, label:, and more.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Gmail search query (e.g., "from:pete subject:meeting after:2024/01/01")' },
+        max_results: { type: 'number', description: 'Maximum results to return (default 10)' }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'list_email_labels',
+    description: 'List all Gmail labels including system labels and user-created labels.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'apply_email_label',
+    description: 'Add or remove labels from an email message.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message_id: { type: 'string', description: 'Gmail message ID' },
+        add_label_ids: { type: 'array', items: { type: 'string' }, description: 'Label IDs to add' },
+        remove_label_ids: { type: 'array', items: { type: 'string' }, description: 'Label IDs to remove' }
+      },
+      required: ['message_id']
+    }
+  },
+  {
+    name: 'reauthorize_microsoft',
+    description: 'Authorize or re-authorize Microsoft Outlook access. Opens browser for OAuth consent. Required before using Outlook email or calendar features.',
+    input_schema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'query_outlook_emails',
+    description: 'Query Microsoft Outlook inbox emails. Supports filters: unread, flagged, important, or all.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        filter: { type: 'string', description: 'Filter: unread, flagged, important, or all (default: unread)' },
+        max_results: { type: 'number', description: 'Maximum results (default 10)' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'read_outlook_email',
+    description: 'Read the full content of an Outlook email by message ID.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message_id: { type: 'string', description: 'Outlook message ID' }
+      },
+      required: ['message_id']
+    }
+  },
+  {
+    name: 'send_outlook_email',
+    description: 'Send an email via Microsoft Outlook.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        to: { type: 'string', description: 'Recipient email(s), comma-separated' },
+        subject: { type: 'string', description: 'Email subject' },
+        body: { type: 'string', description: 'Email body' },
+        cc: { type: 'string', description: 'CC recipients (optional)' },
+        bcc: { type: 'string', description: 'BCC recipients (optional)' }
+      },
+      required: ['to', 'subject', 'body']
+    }
+  },
+  {
+    name: 'modify_outlook_email',
+    description: 'Modify an Outlook email: mark_read, mark_unread, flag, unflag, archive, delete.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message_id: { type: 'string', description: 'Outlook message ID' },
+        action: { type: 'string', description: 'Action: mark_read, mark_unread, flag, unflag, archive, delete' }
+      },
+      required: ['message_id', 'action']
+    }
+  },
+  {
+    name: 'reply_outlook_email',
+    description: 'Reply to an Outlook email.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message_id: { type: 'string', description: 'Outlook message ID to reply to' },
+        body: { type: 'string', description: 'Reply body text' }
+      },
+      required: ['message_id', 'body']
+    }
+  },
+  {
+    name: 'query_outlook_calendar',
+    description: 'Query Microsoft Outlook calendar events. Supports: today, tomorrow, week.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        time_range: { type: 'string', description: 'Time range: today, tomorrow, week (default: today)' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'create_outlook_event',
+    description: 'Create a calendar event in Microsoft Outlook.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Event title' },
+        start_time: { type: 'string', description: 'Start time' },
+        end_time: { type: 'string', description: 'End time (optional)' },
+        description: { type: 'string', description: 'Description (optional)' },
+        location: { type: 'string', description: 'Location (optional)' },
+        attendees: { type: 'array', items: { type: 'string' }, description: 'Attendee emails (optional)' }
+      },
+      required: ['title', 'start_time']
+    }
+  },
+  {
+    name: 'update_outlook_event',
+    description: 'Update an existing Outlook calendar event.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        event_id: { type: 'string', description: 'Outlook event ID' },
+        title: { type: 'string', description: 'New title (optional)' },
+        start_time: { type: 'string', description: 'New start time (optional)' },
+        end_time: { type: 'string', description: 'New end time (optional)' },
+        description: { type: 'string', description: 'New description (optional)' },
+        location: { type: 'string', description: 'New location (optional)' },
+        attendees: { type: 'array', items: { type: 'string' }, description: 'Updated attendees (optional)' }
+      },
+      required: ['event_id']
+    }
+  },
+  {
+    name: 'delete_outlook_event',
+    description: 'Delete a Microsoft Outlook calendar event.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        event_id: { type: 'string', description: 'Outlook event ID to delete' }
+      },
+      required: ['event_id']
     }
   },
   {
@@ -2567,6 +4149,45 @@ const tools = [
         }
       },
       required: ['issue_id']
+    }
+  },
+  {
+    name: 'batch_create_beads',
+    description: 'Create multiple beads/task issues at once. More efficient than creating one at a time.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Issue title' },
+              type: { type: 'string', description: 'Type: task, bug, feature (default: task)' },
+              priority: { type: 'number', description: 'Priority 0-4 (0=critical, 2=medium, 4=backlog)' },
+              description: { type: 'string', description: 'Description (optional)' }
+            },
+            required: ['title']
+          },
+          description: 'Array of beads to create'
+        }
+      },
+      required: ['items']
+    }
+  },
+  {
+    name: 'auto_create_bead',
+    description: 'Proactively create a bead when you detect an urgent or important task in conversation. Include a trigger reason explaining why this warrants tracking. Use for P1 (high priority) or P2 (medium priority) items.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Issue title' },
+        type: { type: 'string', description: 'Type: task, bug, feature (default: task)' },
+        priority: { type: 'number', description: 'Priority: 1 (high) or 2 (medium) recommended' },
+        description: { type: 'string', description: 'Description (optional)' },
+        trigger_reason: { type: 'string', description: 'Why this bead was auto-created (e.g., "User mentioned deadline", "Blocking issue detected")' }
+      },
+      required: ['title', 'trigger_reason']
     }
   },
   // ============================================
@@ -3195,10 +4816,76 @@ async function executeTool(toolName, toolInput) {
         toolInput.start_time,
         toolInput.end_time,
         toolInput.description || '',
-        toolInput.location || ''
+        toolInput.location || '',
+        toolInput.attendees || [],
+        toolInput.calendar_id || null
       );
+    case 'update_calendar_event':
+      return await updateCalendarEvent(
+        toolInput.event_id,
+        { title: toolInput.title, start_time: toolInput.start_time, end_time: toolInput.end_time,
+          description: toolInput.description, location: toolInput.location, attendees: toolInput.attendees },
+        toolInput.calendar_id || 'primary'
+      );
+    case 'delete_calendar_event':
+      return await deleteCalendarEvent(toolInput.event_id, toolInput.calendar_id || 'primary');
+    case 'rsvp_calendar_event':
+      return await rsvpCalendarEvent(toolInput.event_id, toolInput.response, toolInput.calendar_id || 'primary');
+    case 'search_calendar_events':
+      return await searchCalendarEvents(toolInput.query, toolInput.time_min || null, toolInput.time_max || null);
+    case 'create_recurring_event':
+      return await createRecurringEvent(
+        toolInput.title, toolInput.start_time, toolInput.end_time,
+        toolInput.recurrence, toolInput.description || '', toolInput.location || '', toolInput.calendar_id || null
+      );
+    case 'list_calendars':
+      return await listCalendars();
     case 'send_email':
       return await sendEmail(toolInput.to, toolInput.subject, toolInput.body);
+    case 'reauthorize_google':
+      return await reauthorizeGoogle();
+    case 'read_email':
+      return await readEmail(toolInput.message_id);
+    case 'reply_to_email':
+      return await replyToEmail(toolInput.message_id, toolInput.body);
+    case 'forward_email':
+      return await forwardEmail(toolInput.message_id, toolInput.to, toolInput.comment || '');
+    case 'modify_email':
+      return await modifyEmail(toolInput.message_id, toolInput.action);
+    case 'search_emails':
+      return await searchEmails(toolInput.query, toolInput.max_results || 10);
+    case 'list_email_labels':
+      return await listEmailLabels();
+    case 'apply_email_label':
+      return await applyEmailLabel(toolInput.message_id, toolInput.add_label_ids || [], toolInput.remove_label_ids || []);
+    // Outlook
+    case 'reauthorize_microsoft':
+      return await reauthorizeMicrosoft();
+    case 'query_outlook_emails':
+      return await queryOutlookEmails(toolInput.filter || 'unread', toolInput.max_results || 10);
+    case 'read_outlook_email':
+      return await readOutlookEmail(toolInput.message_id);
+    case 'send_outlook_email':
+      return await sendOutlookEmail(toolInput.to, toolInput.subject, toolInput.body, toolInput.cc || '', toolInput.bcc || '');
+    case 'modify_outlook_email':
+      return await modifyOutlookEmail(toolInput.message_id, toolInput.action);
+    case 'reply_outlook_email':
+      return await replyOutlookEmail(toolInput.message_id, toolInput.body);
+    // Outlook Calendar
+    case 'query_outlook_calendar':
+      return await queryOutlookCalendar(toolInput.time_range || 'today');
+    case 'create_outlook_event':
+      return await createOutlookEvent(
+        toolInput.title, toolInput.start_time, toolInput.end_time,
+        toolInput.description || '', toolInput.location || '', toolInput.attendees || []
+      );
+    case 'update_outlook_event':
+      return await updateOutlookEvent(toolInput.event_id, {
+        title: toolInput.title, start_time: toolInput.start_time, end_time: toolInput.end_time,
+        description: toolInput.description, location: toolInput.location, attendees: toolInput.attendees
+      });
+    case 'delete_outlook_event':
+      return await deleteOutlookEvent(toolInput.event_id);
     case 'create_zoom_meeting':
       return await createZoomMeeting(
         toolInput.topic,
@@ -3226,6 +4913,13 @@ async function executeTool(toolName, toolInput) {
       return await updateBeadStatus(toolInput.issue_id, toolInput.status);
     case 'close_bead':
       return await closeBead(toolInput.issue_id, toolInput.reason || '');
+    case 'batch_create_beads':
+      return await batchCreateBeads(toolInput.items);
+    case 'auto_create_bead':
+      return await autoCreateBeadFromContext(
+        toolInput.title, toolInput.type || 'task', toolInput.priority ?? 2,
+        toolInput.description || '', toolInput.trigger_reason
+      );
     // Reminders
     case 'create_reminder':
       return await createReminder(toolInput.text, toolInput.time);
@@ -3367,7 +5061,7 @@ async function chatWithAI(userMessage, includeTelegram = false) {
 
     const memoryContext = buildMemoryContext();
     const systemPrompt = (config?.ai?.systemPrompt ||
-      'You are SpockAI, a helpful personal assistant. Be concise but thorough. You have access to the user\'s calendar, email, task tracking, knowledge base, memory system, scratch pad, and deferred tasks. Use the available tools to fetch real data when asked. You can save important information to long-term memory and the user profile for future sessions. Log significant activities to the daily log.') + memoryContext;
+      'You are SpockAI, a helpful personal assistant. Be concise but thorough. You have access to the user\'s calendar, email (Gmail + Outlook), task tracking, knowledge base, memory system, scratch pad, and deferred tasks. Use the available tools to fetch real data when asked. You can save important information to long-term memory and the user profile for future sessions. Log significant activities to the daily log. When you detect urgent or important tasks in conversation (deadlines mentioned, blocking issues, critical items), proactively suggest creating P1 or P2 beads using auto_create_bead with a clear trigger reason. Use batch_create_beads when multiple related tasks need tracking.') + memoryContext;
 
     let response = await anthropic.messages.create({
       model: config?.ai?.model || 'claude-sonnet-4-20250514',
@@ -4213,6 +5907,49 @@ function initializeDeferred() {
       scheduleDeferredItem(item);
     }
   }
+}
+
+// ============================================
+// SINGLE-INSTANCE MANAGEMENT
+// ============================================
+
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  // Another instance is already running. Show choice dialog.
+  const choice = dialog.showMessageBoxSync({
+    type: 'question',
+    title: 'SpockAI Already Running',
+    message: 'SpockAI is already running in the system tray.',
+    detail: 'What would you like to do?',
+    buttons: [
+      'Open existing chat session',
+      'Start new instance anyway',
+      'Cancel'
+    ],
+    defaultId: 0,
+    cancelId: 2,
+    noLink: true
+  });
+
+  if (choice === 0 || choice === 2) {
+    // "Open existing" or "Cancel" - quit this instance
+    app.quit();
+  }
+  // choice === 1: fall through - app continues without lock (two instances run)
+}
+
+// When a second instance tries to start, bring existing window to front
+if (gotTheLock) {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    if (chatWindow) {
+      if (chatWindow.isMinimized()) {
+        chatWindow.restore();
+      }
+      chatWindow.show();
+      chatWindow.focus();
+    }
+  });
 }
 
 // App lifecycle

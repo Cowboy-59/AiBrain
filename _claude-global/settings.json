@@ -126,7 +126,8 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/bead-comment-reminder.sh",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
           }
         ]
       }
